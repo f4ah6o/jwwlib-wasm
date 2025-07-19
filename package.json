@@ -35,12 +35,12 @@
   "license": "GPL-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/jwwlib-wasm.git"
+    "url": "https://github.com/f4ah6o/jwwlib-wasm.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/jwwlib-wasm/issues"
+    "url": "https://github.com/f4ah6o/jwwlib-wasm/issues"
   },
-  "homepage": "https://github.com/yourusername/jwwlib-wasm#readme",
+  "homepage": "https://github.com/f4ah6o/jwwlib-wasm",
   "devDependencies": {
     "@biomejs/biome": "^1.8.0",
     "@types/node": "^20.0.0",

@@ -75,7 +75,7 @@ entities.forEach(entity => {
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/jwwlib-wasm.git
+git clone https://github.com/f4ah6o/jwwlib-wasm.git
 cd jwwlib-wasm
 
 # Install dependencies
