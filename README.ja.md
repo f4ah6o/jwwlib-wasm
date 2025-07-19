@@ -117,8 +117,8 @@ JWWファイルからすべての図形エンティティを取得します。
 このプロジェクトはGNU General Public License v2.0でライセンスされています。詳細は[LICENSE](LICENSE)ファイルをご覧ください。
 
 このソフトウェアには以下から派生したコードが含まれています：
-- LibreCAD (https://github.com/LibreCAD/LibreCAD)
-- Rallazによるオリジナルのjwwlib
+- [LibreCAD](https://github.com/LibreCAD/LibreCAD) - フリーでオープンソースのCADアプリケーション
+- Rallazによるオリジナルのjwwlib（LibreCADプロジェクトの一部）
 
 ## 貢献
 
@@ -135,6 +135,6 @@ JWWファイルからすべての図形エンティティを取得します。
 
 ## 謝辞
 
-- オリジナルのjwwlib実装を行ったLibreCADチーム
+- オリジナルのjwwlib実装を行った[LibreCAD](https://github.com/LibreCAD/LibreCAD)チーム
 - オリジナルのdxflibプロジェクトを作成したRibbonSoft
 - ファイル形式のドキュメントを提供してくれたJW_CADコミュニティ

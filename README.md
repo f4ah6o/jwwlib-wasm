@@ -117,8 +117,8 @@ Get file header information.
 This project is licensed under the GNU General Public License v2.0 - see the [LICENSE](LICENSE) file for details.
 
 This software contains code derived from:
-- LibreCAD (https://github.com/LibreCAD/LibreCAD)
-- Original jwwlib by Rallaz
+- [LibreCAD](https://github.com/LibreCAD/LibreCAD) - A free Open Source CAD application
+- Original jwwlib by Rallaz (part of LibreCAD project)
 
 ## Contributing
 
@@ -135,6 +135,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Acknowledgments
 
-- LibreCAD team for the original jwwlib implementation
+- [LibreCAD](https://github.com/LibreCAD/LibreCAD) team for the original jwwlib implementation
 - RibbonSoft for the original dxflib project
 - JW_CAD community for the file format documentation
