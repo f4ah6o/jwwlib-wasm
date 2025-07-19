@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jwwlib-wasm Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #dropZone {
+            border: 2px dashed #ccc;
+            border-radius: 20px;
+            width: 100%;
+            height: 200px;
+            text-align: center;
+            line-height: 200px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        #dropZone.dragover {
+            background: #e0e0e0;
+            border-color: #999;
+        }
+        #output {
+            background: #f4f4f4;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        #fileInfo {
+            margin: 20px 0;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 5px;
+            display: none;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin: 20px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>jwwlib-wasm Example</h1>
+    <p>Drag and drop a JWW file to read its contents</p>
+    
+    <div id="dropZone">Drop JWW file here</div>
+    
+    <input type="file" id="fileInput" accept=".jww" style="display: none;">
+    
+    <div id="fileInfo">
+        <h3>File Information</h3>
+        <div id="fileDetails"></div>
+    </div>
+    
+    <canvas id="canvas" width="800" height="600"></canvas>
+    
+    <h3>Output</h3>
+    <div id="output">No file loaded</div>
+
+    <script type="module">
+        // Import the WASM module
+        import createJWWModule from '../dist/jwwlib.js';
+        
+        let JWWModule = null;
+        
+        // Initialize the module
+        async function init() {
+            try {
+                JWWModule = await createJWWModule();
+                console.log('JWW module loaded successfully');
+                setupFileHandling();
+            } catch (error) {
+                console.error('Failed to load JWW module:', error);
+                document.getElementById('output').textContent = 'Failed to load WASM module: ' + error.message;
+            }
+        }
+        
+        function setupFileHandling() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const output = document.getElementById('output');
+            
+            // Click to open file dialog
+            dropZone.addEventListener('click', () => fileInput.click());
+            
+            // File input change
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFile(e.target.files[0]);
+                }
+            });
+            
+            // Drag and drop
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    handleFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+        
+        async function handleFile(file) {
+            if (!file.name.toLowerCase().endsWith('.jww')) {
+                alert('Please select a JWW file');
+                return;
+            }
+            
+            const output = document.getElementById('output');
+            const fileInfo = document.getElementById('fileInfo');
+            const fileDetails = document.getElementById('fileDetails');
+            const canvas = document.getElementById('canvas');
+            
+            output.textContent = 'Loading file...';
+            
+            try {
+                // Read file as ArrayBuffer
+                const arrayBuffer = await file.arrayBuffer();
+                const uint8Array = new Uint8Array(arrayBuffer);
+                
+                // Allocate memory in WASM
+                const dataPtr = JWWModule._malloc(uint8Array.length);
+                JWWModule.HEAPU8.set(uint8Array, dataPtr);
+                
+                // Create reader
+                const reader = new JWWModule.JWWReader(dataPtr, uint8Array.length);
+                
+                // Get file info
+                const header = reader.getHeader();
+                fileDetails.innerHTML = `
+                    <strong>Filename:</strong> ${file.name}<br>
+                    <strong>Size:</strong> ${(file.size / 1024).toFixed(2)} KB<br>
+                    <strong>Version:</strong> ${header.version || 'Unknown'}<br>
+                `;
+                fileInfo.style.display = 'block';
+                
+                // Get entities
+                const entities = reader.getEntities();
+                let outputText = `Found ${entities.size()} entities:\n\n`;
+                
+                // Process and display entities
+                for (let i = 0; i < entities.size(); i++) {
+                    const entity = entities.get(i);
+                    outputText += `Entity ${i + 1}: ${entity.type}\n`;
+                    
+                    switch(entity.type) {
+                        case 'LINE':
+                            outputText += `  From: (${entity.x1.toFixed(2)}, ${entity.y1.toFixed(2)})\n`;
+                            outputText += `  To: (${entity.x2.toFixed(2)}, ${entity.y2.toFixed(2)})\n`;
+                            break;
+                        case 'CIRCLE':
+                            outputText += `  Center: (${entity.cx.toFixed(2)}, ${entity.cy.toFixed(2)})\n`;
+                            outputText += `  Radius: ${entity.radius.toFixed(2)}\n`;
+                            break;
+                        case 'ARC':
+                            outputText += `  Center: (${entity.cx.toFixed(2)}, ${entity.cy.toFixed(2)})\n`;
+                            outputText += `  Radius: ${entity.radius.toFixed(2)}\n`;
+                            outputText += `  Start angle: ${entity.angle1.toFixed(2)}°\n`;
+                            outputText += `  End angle: ${entity.angle2.toFixed(2)}°\n`;
+                            break;
+                    }
+                    outputText += '\n';
+                }
+                
+                output.textContent = outputText;
+                
+                // Draw entities on canvas
+                drawEntities(entities);
+                
+                // Cleanup
+                reader.delete();
+                JWWModule._free(dataPtr);
+                
+            } catch (error) {
+                console.error('Error reading file:', error);
+                output.textContent = 'Error reading file: ' + error.message;
+            }
+        }
+        
+        function drawEntities(entities) {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Find bounds
+            let minX = Infinity, minY = Infinity;
+            let maxX = -Infinity, maxY = -Infinity;
+            
+            for (let i = 0; i < entities.size(); i++) {
+                const entity = entities.get(i);
+                switch(entity.type) {
+                    case 'LINE':
+                        minX = Math.min(minX, entity.x1, entity.x2);
+                        minY = Math.min(minY, entity.y1, entity.y2);
+                        maxX = Math.max(maxX, entity.x1, entity.x2);
+                        maxY = Math.max(maxY, entity.y1, entity.y2);
+                        break;
+                    case 'CIRCLE':
+                    case 'ARC':
+                        minX = Math.min(minX, entity.cx - entity.radius);
+                        minY = Math.min(minY, entity.cy - entity.radius);
+                        maxX = Math.max(maxX, entity.cx + entity.radius);
+                        maxY = Math.max(maxY, entity.cy + entity.radius);
+                        break;
+                }
+            }
+            
+            // Calculate scale and offset
+            const padding = 50;
+            const scaleX = (canvas.width - 2 * padding) / (maxX - minX);
+            const scaleY = (canvas.height - 2 * padding) / (maxY - minY);
+            const scale = Math.min(scaleX, scaleY);
+            
+            const offsetX = padding + (canvas.width - 2 * padding - (maxX - minX) * scale) / 2;
+            const offsetY = padding + (canvas.height - 2 * padding - (maxY - minY) * scale) / 2;
+            
+            // Transform function
+            const transform = (x, y) => ({
+                x: (x - minX) * scale + offsetX,
+                y: canvas.height - ((y - minY) * scale + offsetY)
+            });
+            
+            // Draw entities
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            
+            for (let i = 0; i < entities.size(); i++) {
+                const entity = entities.get(i);
+                
+                switch(entity.type) {
+                    case 'LINE': {
+                        const p1 = transform(entity.x1, entity.y1);
+                        const p2 = transform(entity.x2, entity.y2);
+                        ctx.beginPath();
+                        ctx.moveTo(p1.x, p1.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                        break;
+                    }
+                    case 'CIRCLE': {
+                        const center = transform(entity.cx, entity.cy);
+                        ctx.beginPath();
+                        ctx.arc(center.x, center.y, entity.radius * scale, 0, 2 * Math.PI);
+                        ctx.stroke();
+                        break;
+                    }
+                    case 'ARC': {
+                        const center = transform(entity.cx, entity.cy);
+                        const startAngle = -entity.angle2 * Math.PI / 180;
+                        const endAngle = -entity.angle1 * Math.PI / 180;
+                        ctx.beginPath();
+                        ctx.arc(center.x, center.y, entity.radius * scale, startAngle, endAngle);
+                        ctx.stroke();
+                        break;
+                    }
+                }
+            }
+            
+            canvas.style.display = 'block';
+        }
+        
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>
