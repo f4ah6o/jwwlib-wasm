@@ -1,0 +1,55 @@
+{
+  "name": "jwwlib-wasm",
+  "version": "0.1.0",
+  "description": "WebAssembly library for reading JWW (JW_CAD) files in the browser",
+  "main": "dist/jwwlib.js",
+  "module": "dist/jwwlib.esm.js",
+  "types": "dist/jwwlib.d.ts",
+  "files": [
+    "dist",
+    "wasm"
+  ],
+  "scripts": {
+    "build": "pnpm run build:wasm && pnpm run build:js",
+    "build:wasm": "pnpm run build:wasm:debug && pnpm run build:wasm:release",
+    "build:wasm:debug": "mkdir -p build && cd build && emcmake cmake -DCMAKE_BUILD_TYPE=Debug .. && emmake make",
+    "build:wasm:release": "mkdir -p build-release && cd build-release && emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make",
+    "build:js": "vite build",
+    "dev": "vite",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "lint": "biome check --apply .",
+    "format": "biome format --write .",
+    "prepublishOnly": "pnpm run build"
+  },
+  "keywords": [
+    "jww",
+    "jw-cad",
+    "cad",
+    "wasm",
+    "webassembly",
+    "drawing",
+    "engineering"
+  ],
+  "author": "jwwlib-wasm contributors",
+  "license": "GPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/jwwlib-wasm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/jwwlib-wasm/issues"
+  },
+  "homepage": "https://github.com/yourusername/jwwlib-wasm#readme",
+  "devDependencies": {
+    "@biomejs/biome": "^1.8.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
