@@ -18,16 +18,20 @@
             try {
                 statusEl.textContent = 'Loading WASM module...';
                 
-                const response = await fetch('../wasm/jwwlib.js');
-                if (!response.ok) {
-                    throw new Error(`Failed to load module: ${response.status}`);
+                // Load the script directly
+                const script = document.createElement('script');
+                script.src = '../wasm/jwwlib.js';
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+                
+                // createJWWModule should now be available globally
+                if (typeof createJWWModule === 'undefined') {
+                    throw new Error('createJWWModule not found after loading script');
                 }
-                
-                const moduleCode = await response.text();
-                const moduleBlob = new Blob([moduleCode], { type: 'application/javascript' });
-                const moduleUrl = URL.createObjectURL(moduleBlob);
-                
-                const { default: createJWWModule } = await import(moduleUrl);
                 
                 statusEl.textContent = 'Initializing module...';
                 const JWWModule = await createJWWModule();

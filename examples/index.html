@@ -69,22 +69,28 @@
     <div id="output">No file loaded</div>
 
     <script type="module">
-        // Import the WASM module
-        import createJWWModule from '../wasm/jwwlib.js';
+        // Import the WASM module - load directly as script
+        const script = document.createElement('script');
+        script.src = '../wasm/jwwlib.js';
+        document.head.appendChild(script);
         
-        let JWWModule = null;
-        
-        // Initialize the module
-        async function init() {
-            try {
-                JWWModule = await createJWWModule();
-                console.log('JWW module loaded successfully');
-                setupFileHandling();
-            } catch (error) {
-                console.error('Failed to load JWW module:', error);
-                document.getElementById('output').textContent = 'Failed to load WASM module: ' + error.message;
+        script.onload = async function() {
+            let JWWModule = null;
+            
+            // Initialize the module
+            async function init() {
+                try {
+                    if (typeof createJWWModule === 'undefined') {
+                        throw new Error('createJWWModule not found');
+                    }
+                    JWWModule = await createJWWModule();
+                    console.log('JWW module loaded successfully');
+                    setupFileHandling();
+                } catch (error) {
+                    console.error('Failed to load JWW module:', error);
+                    document.getElementById('output').textContent = 'Failed to load WASM module: ' + error.message;
+                }
             }
-        }
         
         function setupFileHandling() {
             const dropZone = document.getElementById('dropZone');
@@ -281,9 +287,10 @@
             
             canvas.style.display = 'block';
         }
-        
-        // Initialize on load
-        init();
+            
+            // Initialize on load
+            init();
+        };
     </script>
 </body>
 </html>

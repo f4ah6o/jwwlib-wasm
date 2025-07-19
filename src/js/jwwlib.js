@@ -1,0 +1,51 @@
+// ES6 module wrapper for jwwlib-wasm
+
+let moduleInstance = null;
+
+export async function init() {
+    if (moduleInstance) {
+        return moduleInstance;
+    }
+    
+    // Load the Emscripten module
+    const createJWWModule = (await import('../wasm/jwwlib.js')).default;
+    moduleInstance = await createJWWModule();
+    
+    return moduleInstance;
+}
+
+export class JWWReader {
+    constructor(buffer) {
+        if (!moduleInstance) {
+            throw new Error('Module not initialized. Call init() first.');
+        }
+        
+        // Allocate memory and copy buffer
+        const dataPtr = moduleInstance._malloc(buffer.byteLength);
+        moduleInstance.HEAPU8.set(new Uint8Array(buffer), dataPtr);
+        
+        // Create reader instance
+        this.reader = new moduleInstance.JWWReader(dataPtr, buffer.byteLength);
+        this.dataPtr = dataPtr;
+    }
+    
+    getEntities() {
+        return this.reader.getEntities();
+    }
+    
+    getHeader() {
+        return this.reader.getHeader();
+    }
+    
+    dispose() {
+        if (this.reader) {
+            this.reader.delete();
+            moduleInstance._free(this.dataPtr);
+            this.reader = null;
+            this.dataPtr = null;
+        }
+    }
+}
+
+// Re-export the module creation function for compatibility
+export { default as createJWWModule } from '../wasm/jwwlib.js';
