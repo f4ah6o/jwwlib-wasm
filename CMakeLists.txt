@@ -21,10 +21,6 @@ set(CORE_SOURCES
     src/core/dl_jww.cpp
     src/core/jwwdoc.cpp
     src/core/dl_writer_ascii.cpp
-    src/core/dl_attributes.cpp
-    src/core/dl_codes.cpp
-    src/core/dl_entities.cpp
-    src/core/dl_writer.cpp
 )
 
 # WASM specific sources
