@@ -106,18 +106,37 @@ private:
     std::unique_ptr<JSCreationInterface> creationInterface;
     
 public:
-    JWWReader() : jww(std::make_unique<DL_Jww>()), 
-                  creationInterface(std::make_unique<JSCreationInterface>()) {}
+    JWWReader() : creationInterface(std::make_unique<JSCreationInterface>()) {}
     
-    bool readFile(const std::string& filename) {
-        creationInterface->clear();
-        return jww->in(filename, creationInterface.get());
+    // Constructor with data pointer and size
+    JWWReader(uintptr_t dataPtr, size_t size) : creationInterface(std::make_unique<JSCreationInterface>()) {
+        readFile(dataPtr, size);
     }
     
-    bool readData(const std::vector<uint8_t>& data) {
-        // TODO: Implement reading from memory buffer
-        // For now, we'll need to write to a temporary file in MEMFS
-        return false;
+    bool readFile(uintptr_t dataPtr, size_t size) {
+        creationInterface->clear();
+        
+        // Read data from memory
+        const uint8_t* data = reinterpret_cast<const uint8_t*>(dataPtr);
+        std::vector<uint8_t> buffer(data, data + size);
+        
+        // Write buffer to temporary file in MEMFS
+        std::string tempFile = "/tmp/jww_temp.jww";
+        FILE* fp = fopen(tempFile.c_str(), "wb");
+        if (!fp) {
+            return false;
+        }
+        fwrite(data, 1, size, fp);
+        fclose(fp);
+        
+        // Use DL_Jww to read the file
+        jww = std::make_unique<DL_Jww>();
+        bool result = jww->in(tempFile, creationInterface.get());
+        
+        // Clean up temporary file
+        remove(tempFile.c_str());
+        
+        return result;
     }
     
     const std::vector<JSLineData>& getLines() const { 
@@ -166,8 +185,8 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
     // JWWReader class
     class_<JWWReader>("JWWReader")
         .constructor<>()
+        .constructor<uintptr_t, size_t>()
         .function("readFile", &JWWReader::readFile)
-        .function("readData", &JWWReader::readData)
         .function("getLines", &JWWReader::getLines)
         .function("getCircles", &JWWReader::getCircles)
         .function("getArcs", &JWWReader::getArcs);
