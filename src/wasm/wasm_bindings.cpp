@@ -25,6 +25,20 @@ struct JSArcData {
     double angle1, angle2;
 };
 
+// Unified entity structure
+struct JSEntity {
+    std::string type;
+    double x1, y1, x2, y2;      // For lines
+    double cx, cy, radius;       // For circles and arcs
+    double angle1, angle2;       // For arcs
+};
+
+// Header information
+struct JSHeader {
+    std::string version;
+    int entityCount;
+};
+
 // JavaScript-friendly creation interface
 class JSCreationInterface : public DL_CreationInterface {
 private:
@@ -150,6 +164,61 @@ public:
     const std::vector<JSArcData>& getArcs() const { 
         return creationInterface->getArcs(); 
     }
+    
+    // Get all entities in a unified format
+    std::vector<JSEntity> getEntities() const {
+        std::vector<JSEntity> entities;
+        
+        // Add lines
+        for (const auto& line : creationInterface->getLines()) {
+            JSEntity entity;
+            entity.type = "LINE";
+            entity.x1 = line.x1;
+            entity.y1 = line.y1;
+            entity.x2 = line.x2;
+            entity.y2 = line.y2;
+            entity.cx = entity.cy = entity.radius = 0.0;
+            entity.angle1 = entity.angle2 = 0.0;
+            entities.push_back(entity);
+        }
+        
+        // Add circles
+        for (const auto& circle : creationInterface->getCircles()) {
+            JSEntity entity;
+            entity.type = "CIRCLE";
+            entity.cx = circle.cx;
+            entity.cy = circle.cy;
+            entity.radius = circle.radius;
+            entity.x1 = entity.y1 = entity.x2 = entity.y2 = 0.0;
+            entity.angle1 = entity.angle2 = 0.0;
+            entities.push_back(entity);
+        }
+        
+        // Add arcs
+        for (const auto& arc : creationInterface->getArcs()) {
+            JSEntity entity;
+            entity.type = "ARC";
+            entity.cx = arc.cx;
+            entity.cy = arc.cy;
+            entity.radius = arc.radius;
+            entity.angle1 = arc.angle1;
+            entity.angle2 = arc.angle2;
+            entity.x1 = entity.y1 = entity.x2 = entity.y2 = 0.0;
+            entities.push_back(entity);
+        }
+        
+        return entities;
+    }
+    
+    // Get header information
+    JSHeader getHeader() const {
+        JSHeader header;
+        header.version = "JWW";
+        header.entityCount = creationInterface->getLines().size() + 
+                           creationInterface->getCircles().size() + 
+                           creationInterface->getArcs().size();
+        return header;
+    }
 };
 
 #ifdef EMSCRIPTEN
@@ -176,10 +245,29 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .field("angle1", &JSArcData::angle1)
         .field("angle2", &JSArcData::angle2);
     
+    // Unified entity structure
+    value_object<JSEntity>("Entity")
+        .field("type", &JSEntity::type)
+        .field("x1", &JSEntity::x1)
+        .field("y1", &JSEntity::y1)
+        .field("x2", &JSEntity::x2)
+        .field("y2", &JSEntity::y2)
+        .field("cx", &JSEntity::cx)
+        .field("cy", &JSEntity::cy)
+        .field("radius", &JSEntity::radius)
+        .field("angle1", &JSEntity::angle1)
+        .field("angle2", &JSEntity::angle2);
+    
+    // Header structure
+    value_object<JSHeader>("Header")
+        .field("version", &JSHeader::version)
+        .field("entityCount", &JSHeader::entityCount);
+    
     // Vectors
     register_vector<JSLineData>("LineDataVector");
     register_vector<JSCircleData>("CircleDataVector");
     register_vector<JSArcData>("ArcDataVector");
+    register_vector<JSEntity>("EntityVector");
     register_vector<uint8_t>("Uint8Vector");
     
     // JWWReader class
@@ -189,6 +277,8 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .function("readFile", &JWWReader::readFile)
         .function("getLines", &JWWReader::getLines)
         .function("getCircles", &JWWReader::getCircles)
-        .function("getArcs", &JWWReader::getArcs);
+        .function("getArcs", &JWWReader::getArcs)
+        .function("getEntities", &JWWReader::getEntities)
+        .function("getHeader", &JWWReader::getHeader);
 }
 #endif // EMSCRIPTEN

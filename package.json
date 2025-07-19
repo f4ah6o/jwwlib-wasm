@@ -19,6 +19,8 @@
     "serve": "python3 test-server.py",
     "test": "vitest",
     "test:ui": "vitest --ui",
+    "test:e2e": "cd tests/e2e && pnpm install && pnpm test",
+    "test:e2e:headed": "cd tests/e2e && pnpm install && pnpm test:headed",
     "lint": "biome check --apply .",
     "format": "biome format --write .",
     "prepublishOnly": "pnpm run build"
