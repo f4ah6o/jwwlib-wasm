@@ -78,11 +78,10 @@ if(EMSCRIPTEN)
     
     # Debug/Release specific settings
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_options(jwwlib_wasm PRIVATE -g)
+        target_compile_options(jwwlib_wasm PRIVATE -g2)
         target_link_options(jwwlib_wasm PRIVATE 
-            -gsource-map
-            "SHELL:-s ASSERTIONS=2"
-            "SHELL:-s SAFE_HEAP=1"
+            "SHELL:-s ASSERTIONS=1"
+            "SHELL:-s SAFE_HEAP=0"
             "SHELL:-s STACK_OVERFLOW_CHECK=1"
         )
     else()

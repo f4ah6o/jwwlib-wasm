@@ -2,6 +2,7 @@
   "name": "jwwlib-wasm",
   "version": "0.1.0",
   "description": "WebAssembly library for reading JWW (JW_CAD) files in the browser",
+  "type": "module",
   "main": "dist/jwwlib.js",
   "module": "dist/jwwlib.esm.js",
   "types": "dist/jwwlib.d.ts",
