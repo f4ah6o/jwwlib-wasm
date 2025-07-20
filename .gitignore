@@ -38,6 +38,11 @@ coverage/
 *.lcov
 .nyc_output/
 
+# E2E test files
+tests/e2e/playwright-report/
+tests/e2e/test-results/
+tests/e2e/pnpm-lock.yaml
+
 # Logs
 *.log
 npm-debug.log*
