@@ -10,6 +10,7 @@
 #include "dl_creationinterface.h"
 #include <vector>
 #include <memory>
+#include <cmath>
 
 // Simple entity data structures for JavaScript
 struct JSLineData {
@@ -25,12 +26,32 @@ struct JSArcData {
     double angle1, angle2;
 };
 
+struct JSTextData {
+    double x, y;             // Text position
+    double height;           // Text height
+    double angle;            // Rotation angle in radians
+    std::string text;        // Text content
+};
+
+struct JSEllipseData {
+    double cx, cy;           // Center position
+    double majorAxis;        // Major axis length
+    double ratio;            // Ratio of minor to major axis
+    double angle;            // Rotation angle in radians
+};
+
 // Unified entity structure
 struct JSEntity {
     std::string type;
     double x1, y1, x2, y2;      // For lines
     double cx, cy, radius;       // For circles and arcs
     double angle1, angle2;       // For arcs
+    double x, y;                 // For text position
+    double height;               // For text height
+    double angle;                // For text rotation and ellipse rotation
+    std::string text;            // For text content
+    double majorAxis;            // For ellipse major axis
+    double ratio;                // For ellipse axis ratio
 };
 
 // Header information
@@ -45,18 +66,24 @@ private:
     std::vector<JSLineData> lines;
     std::vector<JSCircleData> circles;
     std::vector<JSArcData> arcs;
+    std::vector<JSTextData> texts;
+    std::vector<JSEllipseData> ellipses;
     
 public:
     // Getters for JavaScript
     const std::vector<JSLineData>& getLines() const { return lines; }
     const std::vector<JSCircleData>& getCircles() const { return circles; }
     const std::vector<JSArcData>& getArcs() const { return arcs; }
+    const std::vector<JSTextData>& getTexts() const { return texts; }
+    const std::vector<JSEllipseData>& getEllipses() const { return ellipses; }
     
     // Clear all data
     void clear() {
         lines.clear();
         circles.clear();
         arcs.clear();
+        texts.clear();
+        ellipses.clear();
     }
     
     // DL_CreationInterface implementation
@@ -77,7 +104,14 @@ public:
         circles.push_back({data.cx, data.cy, data.radius});
     }
     
-    virtual void addEllipse(const DL_EllipseData& /*data*/) override {}
+    virtual void addEllipse(const DL_EllipseData& data) override {
+        // Calculate major axis length and angle from the major axis endpoint
+        double dx = data.mx - data.cx;
+        double dy = data.my - data.cy;
+        double majorAxis = sqrt(dx * dx + dy * dy);
+        double angle = atan2(dy, dx);
+        ellipses.push_back({data.cx, data.cy, majorAxis, data.ratio, angle});
+    }
     virtual void addPolyline(const DL_PolylineData& /*data*/) override {}
     virtual void addVertex(const DL_VertexData& /*data*/) override {}
     virtual void addSpline(const DL_SplineData& /*data*/) override {}
@@ -89,7 +123,9 @@ public:
     virtual void addSolid(const DL_SolidData& /*data*/) override {}
     virtual void addMText(const DL_MTextData& /*data*/) override {}
     virtual void addMTextChunk(const char* /*text*/) override {}
-    virtual void addText(const DL_TextData& /*data*/) override {}
+    virtual void addText(const DL_TextData& data) override {
+        texts.push_back({data.ipx, data.ipy, data.height, data.angle * M_PI / 180.0, data.text});
+    }
     virtual void addDimAlign(const DL_DimensionData& /*data*/, const DL_DimAlignedData& /*edata*/) override {}
     virtual void addDimLinear(const DL_DimensionData& /*data*/, const DL_DimLinearData& /*edata*/) override {}
     virtual void addDimRadial(const DL_DimensionData& /*data*/, const DL_DimRadialData& /*edata*/) override {}
@@ -165,6 +201,14 @@ public:
         return creationInterface->getArcs(); 
     }
     
+    const std::vector<JSTextData>& getTexts() const { 
+        return creationInterface->getTexts(); 
+    }
+    
+    const std::vector<JSEllipseData>& getEllipses() const { 
+        return creationInterface->getEllipses(); 
+    }
+    
     // Get all entities in a unified format
     std::vector<JSEntity> getEntities() const {
         std::vector<JSEntity> entities;
@@ -179,6 +223,8 @@ public:
             entity.y2 = line.y2;
             entity.cx = entity.cy = entity.radius = 0.0;
             entity.angle1 = entity.angle2 = 0.0;
+            entity.x = entity.y = entity.height = entity.angle = 0.0;
+            entity.majorAxis = entity.ratio = 0.0;
             entities.push_back(entity);
         }
         
@@ -191,6 +237,8 @@ public:
             entity.radius = circle.radius;
             entity.x1 = entity.y1 = entity.x2 = entity.y2 = 0.0;
             entity.angle1 = entity.angle2 = 0.0;
+            entity.x = entity.y = entity.height = entity.angle = 0.0;
+            entity.majorAxis = entity.ratio = 0.0;
             entities.push_back(entity);
         }
         
@@ -204,6 +252,39 @@ public:
             entity.angle1 = arc.angle1;
             entity.angle2 = arc.angle2;
             entity.x1 = entity.y1 = entity.x2 = entity.y2 = 0.0;
+            entity.x = entity.y = entity.height = 0.0;
+            entity.angle = 0.0;
+            entities.push_back(entity);
+        }
+        
+        // Add texts
+        for (const auto& textData : creationInterface->getTexts()) {
+            JSEntity entity;
+            entity.type = "TEXT";
+            entity.x = textData.x;
+            entity.y = textData.y;
+            entity.height = textData.height;
+            entity.angle = textData.angle;
+            entity.text = textData.text;
+            entity.x1 = entity.y1 = entity.x2 = entity.y2 = 0.0;
+            entity.cx = entity.cy = entity.radius = 0.0;
+            entity.angle1 = entity.angle2 = 0.0;
+            entity.majorAxis = entity.ratio = 0.0;
+            entities.push_back(entity);
+        }
+        
+        // Add ellipses
+        for (const auto& ellipse : creationInterface->getEllipses()) {
+            JSEntity entity;
+            entity.type = "ELLIPSE";
+            entity.cx = ellipse.cx;
+            entity.cy = ellipse.cy;
+            entity.majorAxis = ellipse.majorAxis;
+            entity.ratio = ellipse.ratio;
+            entity.angle = ellipse.angle;
+            entity.x1 = entity.y1 = entity.x2 = entity.y2 = 0.0;
+            entity.x = entity.y = entity.height = 0.0;
+            entity.radius = entity.angle1 = entity.angle2 = 0.0;
             entities.push_back(entity);
         }
         
@@ -216,7 +297,9 @@ public:
         header.version = "JWW";
         header.entityCount = creationInterface->getLines().size() + 
                            creationInterface->getCircles().size() + 
-                           creationInterface->getArcs().size();
+                           creationInterface->getArcs().size() +
+                           creationInterface->getTexts().size() +
+                           creationInterface->getEllipses().size();
         return header;
     }
 };
@@ -245,6 +328,20 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .field("angle1", &JSArcData::angle1)
         .field("angle2", &JSArcData::angle2);
     
+    value_object<JSTextData>("TextData")
+        .field("x", &JSTextData::x)
+        .field("y", &JSTextData::y)
+        .field("height", &JSTextData::height)
+        .field("angle", &JSTextData::angle)
+        .field("text", &JSTextData::text);
+    
+    value_object<JSEllipseData>("EllipseData")
+        .field("cx", &JSEllipseData::cx)
+        .field("cy", &JSEllipseData::cy)
+        .field("majorAxis", &JSEllipseData::majorAxis)
+        .field("ratio", &JSEllipseData::ratio)
+        .field("angle", &JSEllipseData::angle);
+    
     // Unified entity structure
     value_object<JSEntity>("Entity")
         .field("type", &JSEntity::type)
@@ -256,7 +353,14 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .field("cy", &JSEntity::cy)
         .field("radius", &JSEntity::radius)
         .field("angle1", &JSEntity::angle1)
-        .field("angle2", &JSEntity::angle2);
+        .field("angle2", &JSEntity::angle2)
+        .field("x", &JSEntity::x)
+        .field("y", &JSEntity::y)
+        .field("height", &JSEntity::height)
+        .field("angle", &JSEntity::angle)
+        .field("text", &JSEntity::text)
+        .field("majorAxis", &JSEntity::majorAxis)
+        .field("ratio", &JSEntity::ratio);
     
     // Header structure
     value_object<JSHeader>("Header")
@@ -267,6 +371,8 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
     register_vector<JSLineData>("LineDataVector");
     register_vector<JSCircleData>("CircleDataVector");
     register_vector<JSArcData>("ArcDataVector");
+    register_vector<JSTextData>("TextDataVector");
+    register_vector<JSEllipseData>("EllipseDataVector");
     register_vector<JSEntity>("EntityVector");
     register_vector<uint8_t>("Uint8Vector");
     
@@ -278,6 +384,8 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .function("getLines", &JWWReader::getLines)
         .function("getCircles", &JWWReader::getCircles)
         .function("getArcs", &JWWReader::getArcs)
+        .function("getTexts", &JWWReader::getTexts)
+        .function("getEllipses", &JWWReader::getEllipses)
         .function("getEntities", &JWWReader::getEntities)
         .function("getHeader", &JWWReader::getHeader);
 }

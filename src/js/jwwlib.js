@@ -33,6 +33,26 @@ export class JWWReader {
         return this.reader.getEntities();
     }
     
+    getLines() {
+        return this.reader.getLines();
+    }
+    
+    getCircles() {
+        return this.reader.getCircles();
+    }
+    
+    getArcs() {
+        return this.reader.getArcs();
+    }
+    
+    getTexts() {
+        return this.reader.getTexts();
+    }
+    
+    getEllipses() {
+        return this.reader.getEllipses();
+    }
+    
     getHeader() {
         return this.reader.getHeader();
     }
