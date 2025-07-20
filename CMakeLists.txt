@@ -30,7 +30,7 @@ set(WASM_SOURCES
 )
 
 # Define macros
-add_definitions(-DSKIP_MOJI)  # Skip text processing initially
+# add_definitions(-DSKIP_MOJI)  # Commented out - already defined in source
 
 # Native build (for testing)
 if(NOT EMSCRIPTEN)
@@ -58,11 +58,7 @@ if(EMSCRIPTEN)
     
     # Emscripten compilation flags
     target_compile_options(jwwlib_wasm PRIVATE
-        "SHELL:-s WASM=1"
-        "SHELL:-s DISABLE_EXCEPTION_CATCHING=1"
-        "SHELL:-s NO_EXIT_RUNTIME=1"
-        "SHELL:-s ALLOW_MEMORY_GROWTH=1"
-        "SHELL:-s FILESYSTEM=1"
+        -fno-exceptions
     )
     
     # Emscripten link flags
@@ -82,9 +78,9 @@ if(EMSCRIPTEN)
     
     # Debug/Release specific settings
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_options(jwwlib_wasm PRIVATE -g4)
+        target_compile_options(jwwlib_wasm PRIVATE -g)
         target_link_options(jwwlib_wasm PRIVATE 
-            -g4
+            -gsource-map
             "SHELL:-s ASSERTIONS=2"
             "SHELL:-s SAFE_HEAP=1"
             "SHELL:-s STACK_OVERFLOW_CHECK=1"

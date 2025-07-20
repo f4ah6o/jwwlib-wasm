@@ -35,7 +35,9 @@
 #include "dl_creationinterface.h"
 #include "wasm_encoding.h"
 
+#ifndef SKIP_MOJI
 #define SKIP_MOJI
+#endif
 #ifdef DEBUG
 #include "rs_debug.h"
 #endif
