@@ -31,6 +31,8 @@
 #include <cstdio>
 #include <cassert>
 #include <cmath>
+#include <iostream>
+#include <cstring>
 
 #include "dl_creationinterface.h"
 #include "wasm_encoding.h"
@@ -1063,7 +1065,30 @@ DL_WriterA* DL_Jww::out(const char* /*file*/, DL_Codes::version /*version*/) {
  * @brief Writes a DXF header to the file currently opened 
  * by the given DXF writer object.
  */
-void DL_Jww::writeHeader(DL_WriterA& /*dw*/) {
+void DL_Jww::writeHeader(DL_WriterA& dw) {
+    dw.comment("dxflib " DL_VERSION);
+    dw.sectionHeader();
+    dw.dxfString(9, "$ACADVER");
+    switch (version) {
+    case DL_Codes::AC1009:
+        dw.dxfString(1, "AC1009");
+        break;
+    case DL_Codes::AC1012:
+        dw.dxfString(1, "AC1012");
+        break;
+    case DL_Codes::AC1014:
+        dw.dxfString(1, "AC1014");
+        break;
+    case DL_Codes::AC1015:
+        dw.dxfString(1, "AC1015");
+        break;
+    }
+    // Newer version require that (otherwise a*cad crashes..)
+    if (version==VER_2000) {
+        dw.dxfString(9, "$HANDSEED");
+        dw.dxfHex(5, 0xFFFF);
+    }
+    //dw.sectionEnd();
 }
 
 
@@ -1076,9 +1101,16 @@ void DL_Jww::writeHeader(DL_WriterA& /*dw*/) {
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writePoint(DL_WriterA& /*dw*/,
-                        const DL_PointData& /*data*/,
-                        const DL_Attributes& /*attrib*/) {
+void DL_Jww::writePoint(DL_WriterA& dw,
+                        const DL_PointData& data,
+                        const DL_Attributes& attrib) {
+    dw.entity("POINT");
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+        dw.dxfString(100, "AcDbPoint");
+    }
+    dw.entityAttributes(attrib);
+    dw.coord(POINT_COORD_CODE, data.x, data.y);
 }
 
 
@@ -1090,9 +1122,17 @@ void DL_Jww::writePoint(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeLine(DL_WriterA& /*dw*/,
-                       const DL_LineData& /*data*/,
-                       const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeLine(DL_WriterA& dw,
+                       const DL_LineData& data,
+                       const DL_Attributes& attrib) {
+    dw.entity("LINE");
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+        dw.dxfString(100, "AcDbLine");
+    }
+    dw.entityAttributes(attrib);
+    dw.coord(LINE_START_CODE, data.x1, data.y1);
+    dw.coord(LINE_END_CODE, data.x2, data.y2);
 }
 
 
@@ -1105,9 +1145,24 @@ void DL_Jww::writeLine(DL_WriterA& /*dw*/,
  * @param attrib Attributes
  * @see writeVertex
  */
-void DL_Jww::writePolyline(DL_WriterA& /*dw*/,
-                           const DL_PolylineData& /*data*/,
-                           const DL_Attributes& /*attrib*/) {
+void DL_Jww::writePolyline(DL_WriterA& dw,
+                           const DL_PolylineData& data,
+                           const DL_Attributes& attrib) {
+    if (version==VER_2000) {
+        dw.entity("LWPOLYLINE");
+        dw.entityAttributes(attrib);
+        dw.dxfString(100, "AcDbEntity");
+        dw.dxfString(100, "AcDbPolyline");
+        dw.dxfInt(90, (int)data.number);
+        dw.dxfInt(70, data.flags);
+    } else {
+        dw.entity("POLYLINE");
+        dw.entityAttributes(attrib);
+        polylineLayer = attrib.getLayer();
+        dw.dxfInt(66, 1);
+        dw.dxfInt(70, data.flags);
+        dw.coord(VERTEX_COORD_CODE, 0.0, 0.0);
+    }
 }
 
 
@@ -1119,8 +1174,23 @@ void DL_Jww::writePolyline(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeVertex(DL_WriterA& /*dw*/,
-                         const DL_VertexData& /*data*/) {
+void DL_Jww::writeVertex(DL_WriterA& dw,
+                         const DL_VertexData& data) {
+    if (version==VER_2000) {
+        dw.dxfReal(10, data.x);
+        dw.dxfReal(20, data.y);
+        if (fabs(data.bulge)>1.0e-10) {
+            dw.dxfReal(42, data.bulge);
+        }
+    } else {
+        dw.entity("VERTEX");
+        //dw.entityAttributes(attrib);
+        dw.dxfString(8, polylineLayer);
+        dw.coord(VERTEX_COORD_CODE, data.x, data.y);
+        if (fabs(data.bulge)>1.0e-10) {
+            dw.dxfReal(42, data.bulge);
+        }
+    }
 }
 
 	
@@ -1128,7 +1198,11 @@ void DL_Jww::writeVertex(DL_WriterA& /*dw*/,
 /**
  * Writes the polyline end. Only needed for DXF R12.
  */
-void DL_Jww::writePolylineEnd(DL_WriterA& /*dw*/) {
+void DL_Jww::writePolylineEnd(DL_WriterA& dw) {
+    if (version==VER_2000) {
+    } else {
+        dw.entity("SEQEND");
+    }
 }
 
 
@@ -1140,9 +1214,20 @@ void DL_Jww::writePolylineEnd(DL_WriterA& /*dw*/) {
  * @param attrib Attributes
  * @see writeControlPoint
  */
-void DL_Jww::writeSpline(DL_WriterA& /*dw*/,
-                         const DL_SplineData& /*data*/,
-                         const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeSpline(DL_WriterA& dw,
+                         const DL_SplineData& data,
+                         const DL_Attributes& attrib) {
+    dw.entity("SPLINE");
+    dw.entityAttributes(attrib);
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+        dw.dxfString(100, "AcDbSpline");
+    }
+    dw.dxfInt(70, data.flags);
+    dw.dxfInt(71, data.degree);
+    dw.dxfInt(72, data.nKnots);            // number of knots
+    dw.dxfInt(73, data.nControl);          // number of control points
+    dw.dxfInt(74, 0);                      // number of fit points
 }
 
 
@@ -1154,8 +1239,11 @@ void DL_Jww::writeSpline(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeControlPoint(DL_WriterA& /*dw*/,
-                               const DL_ControlPointData& /*data*/) {
+void DL_Jww::writeControlPoint(DL_WriterA& dw,
+                               const DL_ControlPointData& data) {
+    dw.dxfReal(10, data.x);
+    dw.dxfReal(20, data.y);
+    dw.dxfReal(30, data.z);
 }
 
 
@@ -1167,8 +1255,9 @@ void DL_Jww::writeControlPoint(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeKnot(DL_WriterA& /*dw*/,
-                       const DL_KnotData& /*data*/) {
+void DL_Jww::writeKnot(DL_WriterA& dw,
+                       const DL_KnotData& data) {
+    dw.dxfReal(40, data.k);
 }
 
 
@@ -1180,9 +1269,17 @@ void DL_Jww::writeKnot(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeCircle(DL_WriterA& /*dw*/,
-                         const DL_CircleData& /*data*/,
-                         const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeCircle(DL_WriterA& dw,
+                         const DL_CircleData& data,
+                         const DL_Attributes& attrib) {
+    dw.entity("CIRCLE");
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+        dw.dxfString(100, "AcDbCircle");
+    }
+    dw.entityAttributes(attrib);
+    dw.coord(10, data.cx, data.cy);
+    dw.dxfReal(40, data.radius);
 }
 
 
@@ -1194,9 +1291,24 @@ void DL_Jww::writeCircle(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeArc(DL_WriterA& /*dw*/,
-                      const DL_ArcData& /*data*/,
-                      const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeArc(DL_WriterA& dw,
+                      const DL_ArcData& data,
+                      const DL_Attributes& attrib) {
+    dw.entity("ARC");
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+    }
+    dw.entityAttributes(attrib);
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbCircle");
+    }
+    dw.coord(10, data.cx, data.cy);
+    dw.dxfReal(40, data.radius);
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbArc");
+    }
+    dw.dxfReal(50, data.angle1);
+    dw.dxfReal(51, data.angle2);
 }
 
 
@@ -1208,9 +1320,22 @@ void DL_Jww::writeArc(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeEllipse(DL_WriterA& /*dw*/,
-                          const DL_EllipseData& /*data*/,
-                          const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeEllipse(DL_WriterA& dw,
+                          const DL_EllipseData& data,
+                          const DL_Attributes& attrib) {
+    if (version>VER_R12) {
+        dw.entity("ELLIPSE");
+        if (version==VER_2000) {
+            dw.dxfString(100, "AcDbEntity");
+            dw.dxfString(100, "AcDbEllipse");
+        }
+        dw.entityAttributes(attrib);
+        dw.coord(10, data.cx, data.cy);
+        dw.coord(11, data.mx, data.my);
+        dw.dxfReal(40, data.ratio);
+        dw.dxfReal(41, data.angle1);
+        dw.dxfReal(42, data.angle2);
+    }
 }
 
 
@@ -1222,9 +1347,40 @@ void DL_Jww::writeEllipse(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeInsert(DL_WriterA& /*dw*/,
-                         const DL_InsertData& /*data*/,
-                         const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeInsert(DL_WriterA& dw,
+                         const DL_InsertData& data,
+                         const DL_Attributes& attrib) {
+    if (data.name.empty()) {
+        std::cerr << "DL_Jww::writeInsert: "
+        << "Block name must not be empty\n";
+        return;
+    }
+    dw.entity("INSERT");
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+        dw.dxfString(100, "AcDbBlockReference");
+    }
+    dw.entityAttributes(attrib);
+    dw.dxfString(2, data.name);
+    dw.dxfReal(10, data.ipx);
+    dw.dxfReal(20, data.ipy);
+    dw.dxfReal(30, 0.0);
+    if (data.sx!=1.0 || data.sy!=1.0) {
+        dw.dxfReal(41, data.sx);
+        dw.dxfReal(42, data.sy);
+        dw.dxfReal(43, 1.0);
+    }
+    if (data.angle!=0.0) {
+        dw.dxfReal(50, data.angle);
+    }
+    if (data.cols!=1 || data.rows!=1) {
+        dw.dxfInt(70, data.cols);
+        dw.dxfInt(71, data.rows);
+    }
+    if (data.colSp!=0.0 || data.rowSp!=0.0) {
+        dw.dxfReal(44, data.colSp);
+        dw.dxfReal(45, data.rowSp);
+    }
 }
 
 
@@ -1236,9 +1392,39 @@ void DL_Jww::writeInsert(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeMText(DL_WriterA& /*dw*/,
-                        const DL_MTextData& /*data*/,
-                        const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeMText(DL_WriterA& dw,
+                        const DL_MTextData& data,
+                        const DL_Attributes& attrib) {
+    dw.entity("MTEXT");
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+        dw.dxfString(100, "AcDbMText");
+    }
+    dw.entityAttributes(attrib);
+    dw.dxfReal(10, data.ipx);
+    dw.dxfReal(20, data.ipy);
+    dw.dxfReal(30, 0.0);
+    dw.dxfReal(40, data.height);
+    dw.dxfReal(41, data.width);
+    dw.dxfInt(71, data.attachmentPoint);
+    dw.dxfInt(72, data.drawingDirection);
+    // Create text chunks of 250 characters each:
+    int length = data.text.length();
+    char chunk[251];
+    int i;
+    for (i=250; i<length; i+=250) {
+        strncpy(chunk, &data.text.c_str()[i-250], 250);
+        chunk[250]='\0';
+        dw.dxfString(3, chunk);
+    }
+    strncpy(chunk, &data.text.c_str()[i-250], 250);
+    chunk[250]='\0';
+    dw.dxfString(1, chunk);
+    dw.dxfString(7, data.style);
+    // since dxflib 2.0.2.1: degrees not rad (error in autodesk dxf doc)
+    dw.dxfReal(50, data.angle/(2.0*M_PI)*360.0);
+    dw.dxfInt(73, data.lineSpacingStyle);
+    dw.dxfReal(44, data.lineSpacingFactor);
 }
 
 
@@ -1250,9 +1436,29 @@ void DL_Jww::writeMText(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeText(DL_WriterA& /*dw*/,
-                       const DL_TextData& /*data*/,
-                       const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeText(DL_WriterA& dw,
+                       const DL_TextData& data,
+                       const DL_Attributes& attrib) {
+    dw.entity("TEXT");
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+        dw.dxfString(100, "AcDbText");
+    }
+    dw.entityAttributes(attrib);
+    dw.dxfReal(10, data.ipx);
+    dw.dxfReal(20, data.ipy);
+    dw.dxfReal(30, 0.0);
+    dw.dxfReal(40, data.height);
+    dw.dxfString(1, data.text);
+    dw.dxfReal(50, data.angle/(2*M_PI)*360.0);
+    dw.dxfReal(41, data.xScaleFactor);
+    dw.dxfString(7, data.style);
+    dw.dxfInt(71, data.textGenerationFlags);
+    dw.dxfInt(72, data.hJustification);
+    dw.dxfReal(11, data.apx);
+    dw.dxfReal(21, data.apy);
+    dw.dxfReal(31, 0.0);
+    dw.dxfInt(73, data.vJustification);
 }
 
 
@@ -1264,10 +1470,52 @@ void DL_Jww::writeText(DL_WriterA& /*dw*/,
  * @param data Specific aligned dimension data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeDimAligned(DL_WriterA& /*dw*/,
-                             const DL_DimensionData& /*data*/,
-                             const DL_DimAlignedData& /*edata*/,
-                             const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeDimAligned(DL_WriterA& dw,
+                             const DL_DimensionData& data,
+                             const DL_DimAlignedData& edata,
+                             const DL_Attributes& attrib) {
+    dw.entity("DIMENSION");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+    }
+    dw.entityAttributes(attrib);
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbDimension");
+    }
+
+    dw.dxfReal(10, data.dpx);
+    dw.dxfReal(20, data.dpy);
+    dw.dxfReal(30, 0.0);
+
+    dw.dxfReal(11, data.mpx);
+    dw.dxfReal(21, data.mpy);
+    dw.dxfReal(31, 0.0);
+
+    dw.dxfInt(70, 1);
+    if (version>VER_R12) {
+        dw.dxfInt(71, data.attachmentPoint);
+        dw.dxfInt(72, data.lineSpacingStyle); // opt
+        dw.dxfReal(41, data.lineSpacingFactor); // opt
+    }
+
+    dw.dxfReal(42, data.angle);
+
+    dw.dxfString(1, data.text);   // opt
+    //dw.dxfString(3, data.style);
+    dw.dxfString(3, "Standard");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbAlignedDimension");
+    }
+
+    dw.dxfReal(13, edata.epx1);
+    dw.dxfReal(23, edata.epy1);
+    dw.dxfReal(33, 0.0);
+
+    dw.dxfReal(14, edata.epx2);
+    dw.dxfReal(24, edata.epy2);
+    dw.dxfReal(34, 0.0);
 }
 
 /**
@@ -1278,10 +1526,58 @@ void DL_Jww::writeDimAligned(DL_WriterA& /*dw*/,
  * @param data Specific linear dimension data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeDimLinear(DL_WriterA& /*dw*/,
-                            const DL_DimensionData& /*data*/,
-                            const DL_DimLinearData& /*edata*/,
-                            const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeDimLinear(DL_WriterA& dw,
+                            const DL_DimensionData& data,
+                            const DL_DimLinearData& edata,
+                            const DL_Attributes& attrib) {
+    dw.entity("DIMENSION");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+    }
+    dw.entityAttributes(attrib);
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbDimension");
+    }
+
+    dw.dxfReal(10, data.dpx);
+    dw.dxfReal(20, data.dpy);
+    dw.dxfReal(30, 0.0);
+
+    dw.dxfReal(11, data.mpx);
+    dw.dxfReal(21, data.mpy);
+    dw.dxfReal(31, 0.0);
+
+    dw.dxfInt(70, 0);
+    if (version>VER_R12) {
+        dw.dxfInt(71, data.attachmentPoint);
+        dw.dxfInt(72, data.lineSpacingStyle); // opt
+        dw.dxfReal(41, data.lineSpacingFactor); // opt
+    }
+
+    dw.dxfReal(42, data.angle);
+
+    dw.dxfString(1, data.text);   // opt
+    //dw.dxfString(3, data.style);
+    dw.dxfString(3, "Standard");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbAlignedDimension");
+    }
+
+    dw.dxfReal(13, edata.dpx1);
+    dw.dxfReal(23, edata.dpy1);
+    dw.dxfReal(33, 0.0);
+
+    dw.dxfReal(14, edata.dpx2);
+    dw.dxfReal(24, edata.dpy2);
+    dw.dxfReal(34, 0.0);
+
+    dw.dxfReal(50, edata.angle/(2.0*M_PI)*360.0);
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbRotatedDimension");
+    }
 }
 
 /**
@@ -1292,10 +1588,50 @@ void DL_Jww::writeDimLinear(DL_WriterA& /*dw*/,
  * @param data Specific radial dimension data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeDimRadial(DL_WriterA& /*dw*/,
-                            const DL_DimensionData& /*data*/,
-                            const DL_DimRadialData& /*edata*/,
-                            const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeDimRadial(DL_WriterA& dw,
+                            const DL_DimensionData& data,
+                            const DL_DimRadialData& edata,
+                            const DL_Attributes& attrib) {
+    dw.entity("DIMENSION");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+    }
+    dw.entityAttributes(attrib);
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbDimension");
+    }
+
+    dw.dxfReal(10, data.dpx);
+    dw.dxfReal(20, data.dpy);
+    dw.dxfReal(30, 0.0);
+
+    dw.dxfReal(11, data.mpx);
+    dw.dxfReal(21, data.mpy);
+    dw.dxfReal(31, 0.0);
+
+    dw.dxfInt(70, 4);
+    if (version>VER_R12) {
+        dw.dxfInt(71, data.attachmentPoint);
+        dw.dxfInt(72, data.lineSpacingStyle); // opt
+        dw.dxfReal(41, data.lineSpacingFactor); // opt
+    }
+
+    dw.dxfReal(42, data.angle);
+
+    dw.dxfString(1, data.text);   // opt
+    //dw.dxfString(3, data.style);
+    dw.dxfString(3, "Standard");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbRadialDimension");
+    }
+
+    dw.dxfReal(15, edata.dpx);
+    dw.dxfReal(25, edata.dpy);
+    dw.dxfReal(35, 0.0);
+
+    dw.dxfReal(40, edata.leader);
 }
 
 /**
@@ -1306,10 +1642,50 @@ void DL_Jww::writeDimRadial(DL_WriterA& /*dw*/,
  * @param data Specific diametric dimension data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeDimDiametric(DL_WriterA& /*dw*/,
-                               const DL_DimensionData& /*data*/,
-                               const DL_DimDiametricData& /*edata*/,
-                               const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeDimDiametric(DL_WriterA& dw,
+                               const DL_DimensionData& data,
+                               const DL_DimDiametricData& edata,
+                               const DL_Attributes& attrib) {
+    dw.entity("DIMENSION");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+    }
+    dw.entityAttributes(attrib);
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbDimension");
+    }
+
+    dw.dxfReal(10, data.dpx);
+    dw.dxfReal(20, data.dpy);
+    dw.dxfReal(30, 0.0);
+
+    dw.dxfReal(11, data.mpx);
+    dw.dxfReal(21, data.mpy);
+    dw.dxfReal(31, 0.0);
+
+    dw.dxfInt(70, 3);
+    if (version>VER_R12) {
+        dw.dxfInt(71, data.attachmentPoint);
+        dw.dxfInt(72, data.lineSpacingStyle); // opt
+        dw.dxfReal(41, data.lineSpacingFactor); // opt
+    }
+
+    dw.dxfReal(42, data.angle);
+
+    dw.dxfString(1, data.text);   // opt
+    //dw.dxfString(3, data.style);
+    dw.dxfString(3, "Standard");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbDiametricDimension");
+    }
+
+    dw.dxfReal(15, edata.dpx);
+    dw.dxfReal(25, edata.dpy);
+    dw.dxfReal(35, 0.0);
+
+    dw.dxfReal(40, edata.leader);
 }
 
 
@@ -1322,10 +1698,60 @@ void DL_Jww::writeDimDiametric(DL_WriterA& /*dw*/,
  * @param data Specific angular dimension data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeDimAngular(DL_WriterA& /*dw*/,
-                             const DL_DimensionData& /*data*/,
-                             const DL_DimAngularData& /*edata*/,
-                             const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeDimAngular(DL_WriterA& dw,
+                             const DL_DimensionData& data,
+                             const DL_DimAngularData& edata,
+                             const DL_Attributes& attrib) {
+    dw.entity("DIMENSION");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+    }
+    dw.entityAttributes(attrib);
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbDimension");
+    }
+
+    dw.dxfReal(10, data.dpx);
+    dw.dxfReal(20, data.dpy);
+    dw.dxfReal(30, 0.0);
+
+    dw.dxfReal(11, data.mpx);
+    dw.dxfReal(21, data.mpy);
+    dw.dxfReal(31, 0.0);
+
+    dw.dxfInt(70, 2);
+    if (version>VER_R12) {
+        dw.dxfInt(71, data.attachmentPoint);
+        dw.dxfInt(72, data.lineSpacingStyle); // opt
+        dw.dxfReal(41, data.lineSpacingFactor); // opt
+    }
+
+    dw.dxfReal(42, data.angle);
+
+    dw.dxfString(1, data.text);   // opt
+    //dw.dxfString(3, data.style);
+    dw.dxfString(3, "Standard");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDb2LineAngularDimension");
+    }
+
+    dw.dxfReal(13, edata.dpx1);
+    dw.dxfReal(23, edata.dpy1);
+    dw.dxfReal(33, 0.0);
+
+    dw.dxfReal(14, edata.dpx2);
+    dw.dxfReal(24, edata.dpy2);
+    dw.dxfReal(34, 0.0);
+
+    dw.dxfReal(15, edata.dpx3);
+    dw.dxfReal(25, edata.dpy3);
+    dw.dxfReal(35, 0.0);
+
+    dw.dxfReal(16, edata.dpx4);
+    dw.dxfReal(26, edata.dpy4);
+    dw.dxfReal(36, 0.0);
 }
 
 /**
@@ -1336,10 +1762,56 @@ void DL_Jww::writeDimAngular(DL_WriterA& /*dw*/,
  * @param data Specific angular dimension data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeDimAngular3P(DL_WriterA& /*dw*/,
-                               const DL_DimensionData& /*data*/,
-                               const DL_DimAngular3PData& /*edata*/,
-                               const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeDimAngular3P(DL_WriterA& dw,
+                               const DL_DimensionData& data,
+                               const DL_DimAngular3PData& edata,
+                               const DL_Attributes& attrib) {
+    dw.entity("DIMENSION");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbEntity");
+    }
+    dw.entityAttributes(attrib);
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDbDimension");
+    }
+
+    dw.dxfReal(10, data.dpx);
+    dw.dxfReal(20, data.dpy);
+    dw.dxfReal(30, 0.0);
+
+    dw.dxfReal(11, data.mpx);
+    dw.dxfReal(21, data.mpy);
+    dw.dxfReal(31, 0.0);
+
+    dw.dxfInt(70, 5);
+    if (version>VER_R12) {
+        dw.dxfInt(71, data.attachmentPoint);
+        dw.dxfInt(72, data.lineSpacingStyle); // opt
+        dw.dxfReal(41, data.lineSpacingFactor); // opt
+    }
+
+    dw.dxfReal(42, data.angle);
+
+    dw.dxfString(1, data.text);   // opt
+    //dw.dxfString(3, data.style);
+    dw.dxfString(3, "Standard");
+
+    if (version==VER_2000) {
+        dw.dxfString(100, "AcDb3PointAngularDimension");
+    }
+
+    dw.dxfReal(13, edata.dpx1);
+    dw.dxfReal(23, edata.dpy1);
+    dw.dxfReal(33, 0.0);
+
+    dw.dxfReal(14, edata.dpx2);
+    dw.dxfReal(24, edata.dpy2);
+    dw.dxfReal(34, 0.0);
+
+    dw.dxfReal(15, edata.dpx3);
+    dw.dxfReal(25, edata.dpy3);
+    dw.dxfReal(35, 0.0);
 }
 
 /**
@@ -1470,9 +1942,43 @@ void DL_Jww::writeImageDef(DL_WriterA& /*dw*/,
  * @param data Entity data from the file
  * @param attrib Attributes
  */
-void DL_Jww::writeLayer(DL_WriterA& /*dw*/,
-                        const DL_LayerData& /*data*/,
-                        const DL_Attributes& /*attrib*/) {
+void DL_Jww::writeLayer(DL_WriterA& dw,
+                        const DL_LayerData& data,
+                        const DL_Attributes& attrib) {
+    if (data.name.empty()) {
+        std::cerr << "DL_Jww::writeLayer: "
+        << "Layer name must not be empty\n";
+        return;
+    }
+    int color = attrib.getColor();
+    if (color<=0 || color>=256) {
+        std::cerr << "Layer color cannot be " << color << ". Changed to 7.\n";
+        color = 7;
+    }
+    if (data.name == "0") {
+        dw.tableLayerEntry(0x10);
+    } else {
+        dw.tableLayerEntry();
+    }
+    dw.dxfString(2, data.name);
+    dw.dxfInt(70, data.flags);
+    dw.dxfInt(62, color);
+    dw.dxfString(6, (attrib.getLineType().length()==0 ?
+                     string("CONTINUOUS") : attrib.getLineType()));
+    if (version>=VER_2000) {
+        // layer defpoints cannot be plotted
+        std::string lstr = data.name;
+        std::transform(lstr.begin(), lstr.end(), lstr.begin(), [](unsigned char c){ return std::tolower(c); });
+        if (lstr=="defpoints") {
+            dw.dxfInt(290, 0);
+        }
+    }
+    if (version>=VER_2000 && attrib.getWidth()!=-1) {
+        dw.dxfInt(370, attrib.getWidth());
+    }
+    if (version>=VER_2000) {
+        dw.dxfHex(390, 0xF);
+    }
 }
 
 
@@ -1481,8 +1987,58 @@ void DL_Jww::writeLayer(DL_WriterA& /*dw*/,
  * Writes a line type to the file. Line types are stored in the 
  * tables section of a DXF file.
  */
-void DL_Jww::writeLineType(DL_WriterA& /*dw*/,
-                           const DL_LineTypeData& /*data*/) {
+void DL_Jww::writeLineType(DL_WriterA& dw,
+                           const DL_LineTypeData& data) {
+    if (data.name.empty()) {
+        std::cerr << "DL_Jww::writeLineType: "
+        << "Line type name must not be empty\n";
+        return;
+    }
+
+    // ignore BYLAYER, BYBLOCK for R12
+    if (version<VER_2000) {
+        if (!strcasecmp(data.name.c_str(), "BYBLOCK") ||
+            !strcasecmp(data.name.c_str(), "BYLAYER")) {
+            return;
+        }
+    }
+
+    // write id (not for R12)
+    if (!strcasecmp(data.name.c_str(), "BYBLOCK")) {
+        dw.tableLineTypeEntry(0x14);
+    } else if (!strcasecmp(data.name.c_str(), "BYLAYER")) {
+        dw.tableLineTypeEntry(0x15);
+    } else if (!strcasecmp(data.name.c_str(), "CONTINUOUS")) {
+        dw.tableLineTypeEntry(0x16);
+    } else {
+        dw.tableLineTypeEntry();
+    }
+
+    dw.dxfString(2, data.name);
+    dw.dxfInt(70, data.flags);
+
+    if (!strcasecmp(data.name.c_str(), "BYBLOCK")) {
+        dw.dxfString(3, "");
+        dw.dxfInt(72, 65);
+        dw.dxfInt(73, 0);
+        dw.dxfReal(40, 0.0);
+    } else if (!strcasecmp(data.name.c_str(), "BYLAYER")) {
+        dw.dxfString(3, "");
+        dw.dxfInt(72, 65);
+        dw.dxfInt(73, 0);
+        dw.dxfReal(40, 0.0);
+    } else if (!strcasecmp(data.name.c_str(), "CONTINUOUS")) {
+        dw.dxfString(3, "Solid line");
+        dw.dxfInt(72, 65);
+        dw.dxfInt(73, 0);
+        dw.dxfReal(40, 0.0);
+    } else {
+        // For custom line types, use simple implementation
+        dw.dxfString(3, "");
+        dw.dxfInt(72, 65);
+        dw.dxfInt(73, 0);
+        dw.dxfReal(40, 0.0);
+    }
 }
 
 /**
@@ -1498,7 +2054,28 @@ void DL_Jww::writeAppid(DL_WriterA& /*dw*/, const string& /*name*/) {
 /**
  * Writes a block's definition (no entities) to the DXF file.
  */
-void DL_Jww::writeBlock(DL_WriterA& /*dw*/, const DL_BlockData& /*data*/) {
+void DL_Jww::writeBlock(DL_WriterA& dw, const DL_BlockData& data) {
+    if (data.name.empty()) {
+        std::cerr << "DL_Jww::writeBlock: "
+        << "Block name must not be empty\n";
+        return;
+    }
+    //bool paperSpace = !strcasecmp(name, "*paper_space");
+    //!strcasecmp(name, "*paper_space0");
+    if (!strcasecmp(data.name.c_str(), "*paper_space")) {
+        dw.sectionBlockEntry(0x1C);
+    } else if (!strcasecmp(data.name.c_str(), "*model_space")) {
+        dw.sectionBlockEntry(0x20);
+    } else if (!strcasecmp(data.name.c_str(), "*paper_space0")) {
+        dw.sectionBlockEntry(0x24);
+    } else {
+        dw.sectionBlockEntry();
+    }
+    dw.dxfString(2, data.name);
+    dw.dxfInt(70, 0);
+    dw.coord(10, data.bpx, data.bpy);
+    dw.dxfString(3, data.name);
+    dw.dxfString(1, "");
 }
 
 
@@ -1508,7 +2085,16 @@ void DL_Jww::writeBlock(DL_WriterA& /*dw*/, const DL_BlockData& /*data*/) {
  *
  * @param name Block name
  */
-void DL_Jww::writeEndBlock(DL_WriterA& /*dw*/, const string& /*name*/) {
+void DL_Jww::writeEndBlock(DL_WriterA& dw, const string& name) {
+    if (!strcasecmp(name.c_str(), "*paper_space")) {
+        dw.sectionBlockEntryEnd(0x1D);
+    } else if (!strcasecmp(name.c_str(), "*model_space")) {
+        dw.sectionBlockEntryEnd(0x21);
+    } else if (!strcasecmp(name.c_str(), "*paper_space0")) {
+        dw.sectionBlockEntryEnd(0x25);
+    } else {
+        dw.sectionBlockEntryEnd();
+    }
 }
 
 
