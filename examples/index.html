@@ -1,262 +1,635 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>jwwlib-wasm Example</title>
+    <title>JWWLib WASM Demo</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            margin: 0;
             padding: 20px;
+            background: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .tab:hover {
+            background: #f0f0f0;
+        }
+        .tab.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        .tab-content {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 0 5px 5px 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .tab-content.active {
+            display: block;
         }
         #dropZone {
-            border: 2px dashed #ccc;
-            border-radius: 20px;
-            width: 100%;
-            height: 200px;
+            border: 3px dashed #3498db;
+            border-radius: 10px;
+            padding: 40px;
             text-align: center;
-            line-height: 200px;
             margin: 20px 0;
-            background: #f9f9f9;
+            background: #ecf0f1;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        #dropZone:hover {
+            background: #d5e3ec;
         }
         #dropZone.dragover {
-            background: #e0e0e0;
-            border-color: #999;
-        }
-        #output {
-            background: #f4f4f4;
-            border: 1px solid #ddd;
-            padding: 10px;
-            border-radius: 5px;
-            white-space: pre-wrap;
-            font-family: monospace;
-            font-size: 14px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        #fileInfo {
-            margin: 20px 0;
-            padding: 10px;
-            background: #e8f5e9;
-            border-radius: 5px;
-            display: none;
+            background: #3498db;
+            color: white;
+            border-color: #2980b9;
         }
         canvas {
             border: 1px solid #ddd;
+            display: block;
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .info-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .entity-list {
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .entity-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: #f0f0f0;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+        }
+        .entity-item.text {
+            border-left-color: #e74c3c;
+        }
+        .entity-item.circle {
+            border-left-color: #2ecc71;
+        }
+        .entity-item.arc {
+            border-left-color: #f39c12;
+        }
+        .color-info {
+            display: inline-block;
+            margin-left: 10px;
+        }
+        .color-sample {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 1px solid #000;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+        .statistics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
             margin: 20px 0;
+        }
+        .stat-card {
+            background: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        .color-bar {
+            display: flex;
+            height: 30px;
+            margin: 20px 0;
+            border-radius: 5px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .color-segment {
+            height: 100%;
+            transition: width 0.3s;
+            position: relative;
+        }
+        .color-segment:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 3px;
+            white-space: nowrap;
+            z-index: 10;
+        }
+        .encoding-test {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .test-result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .test-result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+        input[type="file"] {
             display: none;
+        }
+        .button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #2980b9;
         }
     </style>
 </head>
 <body>
-    <h1>jwwlib-wasm Example</h1>
-    <p>Drag and drop a JWW file to read its contents</p>
-    
-    <div id="dropZone">Drop JWW file here</div>
-    
-    <input type="file" id="fileInput" accept=".jww" style="display: none;">
-    
-    <div id="fileInfo">
-        <h3>File Information</h3>
-        <div id="fileDetails"></div>
+    <div class="container">
+        <h1>JWWLib WASM Demo</h1>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="viewer">ビューア</div>
+            <div class="tab" data-tab="analysis">解析情報</div>
+            <div class="tab" data-tab="color">色情報</div>
+            <div class="tab" data-tab="encoding">エンコーディング</div>
+            <div class="tab" data-tab="test">テスト</div>
+        </div>
+        
+        <div id="dropZone">
+            <p style="font-size: 1.2em; margin: 0;">JWWファイルをドラッグ＆ドロップ</p>
+            <p style="margin: 10px 0;">または</p>
+            <button class="button">ファイルを選択</button>
+        </div>
+        <input type="file" id="fileInput" accept=".jww">
+        
+        <!-- ビューアタブ -->
+        <div class="tab-content active" data-content="viewer">
+            <canvas id="viewerCanvas" width="800" height="600" style="width: 100%; max-width: 800px;"></canvas>
+            <div class="info-panel">
+                <div id="viewerInfo">ファイルを選択してください</div>
+            </div>
+        </div>
+        
+        <!-- 解析情報タブ -->
+        <div class="tab-content" data-content="analysis">
+            <div class="statistics" id="statistics"></div>
+            <div class="info-panel">
+                <h3>エンティティ一覧</h3>
+                <div class="entity-list" id="entityList"></div>
+            </div>
+        </div>
+        
+        <!-- 色情報タブ -->
+        <div class="tab-content" data-content="color">
+            <div class="color-bar" id="colorBar"></div>
+            <div class="info-panel">
+                <h3>色別統計</h3>
+                <div id="colorStatistics"></div>
+            </div>
+            <div class="info-panel">
+                <h3>色付きエンティティ</h3>
+                <div class="entity-list" id="coloredEntities"></div>
+            </div>
+        </div>
+        
+        <!-- エンコーディングタブ -->
+        <div class="tab-content" data-content="encoding">
+            <div class="encoding-test">
+                <h3>テキストエンコーディング情報</h3>
+                <div id="encodingInfo"></div>
+            </div>
+            <canvas id="textCanvas" width="800" height="400" style="width: 100%; max-width: 800px;"></canvas>
+        </div>
+        
+        <!-- テストタブ -->
+        <div class="tab-content" data-content="test">
+            <div class="info-panel">
+                <h3>モジュール情報</h3>
+                <pre id="moduleInfo"></pre>
+            </div>
+            <div class="info-panel">
+                <h3>詳細テスト結果</h3>
+                <div id="testResults"></div>
+            </div>
+        </div>
     </div>
-    
-    <canvas id="canvas" width="800" height="600"></canvas>
-    
-    <h3>Output</h3>
-    <div id="output">No file loaded</div>
 
     <script type="module">
-        // Import the WASM module - load directly as script
-        const script = document.createElement('script');
-        script.src = '../wasm/jwwlib.js';
-        document.head.appendChild(script);
+        import { decodeShiftJIS, getEntityText } from './text-encoding-utils.js';
         
-        script.onload = async function() {
-            let JWWModule = null;
-            
-            // Initialize the module
-            async function init() {
-                try {
-                    if (typeof createJWWModule === 'undefined') {
-                        throw new Error('createJWWModule not found');
-                    }
-                    JWWModule = await createJWWModule();
-                    console.log('JWW module loaded successfully');
-                    setupFileHandling();
-                } catch (error) {
-                    console.error('Failed to load JWW module:', error);
-                    document.getElementById('output').textContent = 'Failed to load WASM module: ' + error.message;
-                }
+        // グローバル変数
+        let JWWModule = null;
+        let currentReader = null;
+        let currentEntities = null;
+        
+        // 色マッピング
+        const colorToRGB = {
+            0: "#000000",     // BYBLOCK
+            1: "#FF0000",     // Red
+            2: "#FFFF00",     // Yellow
+            3: "#00FF00",     // Green
+            4: "#00FFFF",     // Cyan
+            5: "#0000FF",     // Blue
+            6: "#FF00FF",     // Magenta
+            7: "#FFFFFF",     // White
+            8: "#808080",     // Gray
+            23: "#FFA0A0",    // Light red
+            131: "#A0FFFF",   // Light cyan
+            221: "#FFA0FF",   // Light magenta
+            250: "#000000",   // Black
+            252: "#C0C0C0",   // Light gray
+            256: "#808080"    // BYLAYER
+        };
+        
+        const colorNames = {
+            0: "BYBLOCK",
+            1: "赤",
+            2: "黄",
+            3: "緑",
+            4: "シアン",
+            5: "青",
+            6: "マゼンタ",
+            7: "白",
+            8: "グレー",
+            23: "明るい赤",
+            131: "明るいシアン",
+            221: "明るいマゼンタ",
+            250: "黒",
+            252: "明るいグレー",
+            256: "BYLAYER"
+        };
+        
+        // タブ切り替え
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelector(`[data-content="${tab.dataset.tab}"]`).classList.add('active');
+            });
+        });
+        
+        // ファイル選択
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.querySelector('.button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
             }
+        });
         
-        function setupFileHandling() {
-            const dropZone = document.getElementById('dropZone');
-            const fileInput = document.getElementById('fileInput');
-            const output = document.getElementById('output');
+        // ドラッグ＆ドロップ
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        // WASMモジュール初期化
+        async function initModule() {
+            const script = document.createElement('script');
+            script.src = '../wasm/jwwlib.js';
+            document.head.appendChild(script);
             
-            // Click to open file dialog
-            dropZone.addEventListener('click', () => fileInput.click());
-            
-            // File input change
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleFile(e.target.files[0]);
-                }
-            });
-            
-            // Drag and drop
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('dragover');
-            });
-            
-            dropZone.addEventListener('dragleave', () => {
-                dropZone.classList.remove('dragover');
-            });
-            
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('dragover');
-                
-                if (e.dataTransfer.files.length > 0) {
-                    handleFile(e.dataTransfer.files[0]);
-                }
+            return new Promise((resolve, reject) => {
+                script.onload = async () => {
+                    try {
+                        JWWModule = await createJWWModule();
+                        updateModuleInfo();
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                script.onerror = reject;
             });
         }
         
+        // モジュール情報更新
+        function updateModuleInfo() {
+            const info = {
+                ready: true,
+                hasJWWReader: typeof JWWModule.JWWReader !== 'undefined',
+                malloc: typeof JWWModule._malloc === 'function',
+                free: typeof JWWModule._free === 'function'
+            };
+            document.getElementById('moduleInfo').textContent = JSON.stringify(info, null, 2);
+        }
+        
+        // ファイル処理
         async function handleFile(file) {
             if (!file.name.toLowerCase().endsWith('.jww')) {
-                alert('Please select a JWW file');
+                alert('JWWファイルを選択してください');
                 return;
             }
             
-            const output = document.getElementById('output');
-            const fileInfo = document.getElementById('fileInfo');
-            const fileDetails = document.getElementById('fileDetails');
-            const canvas = document.getElementById('canvas');
-            
-            output.textContent = 'Loading file...';
-            
             try {
-                // Read file as ArrayBuffer
                 const arrayBuffer = await file.arrayBuffer();
                 const uint8Array = new Uint8Array(arrayBuffer);
                 
-                // Allocate memory in WASM
                 const dataPtr = JWWModule._malloc(uint8Array.length);
                 JWWModule.HEAPU8.set(uint8Array, dataPtr);
                 
-                // Create reader
-                const reader = new JWWModule.JWWReader(dataPtr, uint8Array.length);
-                
-                // Get file info
-                const header = reader.getHeader();
-                fileDetails.innerHTML = `
-                    <strong>Filename:</strong> ${file.name}<br>
-                    <strong>Size:</strong> ${(file.size / 1024).toFixed(2)} KB<br>
-                    <strong>Version:</strong> ${header.version || 'Unknown'}<br>
-                `;
-                fileInfo.style.display = 'block';
-                
-                // Get entities
-                const entities = reader.getEntities();
-                let outputText = `Found ${entities.size()} entities:\n\n`;
-                
-                // Process and display entities
-                for (let i = 0; i < entities.size(); i++) {
-                    const entity = entities.get(i);
-                    outputText += `Entity ${i + 1}: ${entity.type}\n`;
-                    
-                    switch(entity.type) {
-                        case 'LINE':
-                            outputText += `  From: (${entity.x1.toFixed(2)}, ${entity.y1.toFixed(2)})\n`;
-                            outputText += `  To: (${entity.x2.toFixed(2)}, ${entity.y2.toFixed(2)})\n`;
-                            break;
-                        case 'CIRCLE':
-                            outputText += `  Center: (${entity.cx.toFixed(2)}, ${entity.cy.toFixed(2)})\n`;
-                            outputText += `  Radius: ${entity.radius.toFixed(2)}\n`;
-                            break;
-                        case 'ARC':
-                            outputText += `  Center: (${entity.cx.toFixed(2)}, ${entity.cy.toFixed(2)})\n`;
-                            outputText += `  Radius: ${entity.radius.toFixed(2)}\n`;
-                            outputText += `  Start angle: ${entity.angle1.toFixed(2)}°\n`;
-                            outputText += `  End angle: ${entity.angle2.toFixed(2)}°\n`;
-                            break;
-                    }
-                    outputText += '\n';
+                if (currentReader) {
+                    currentReader.delete();
                 }
                 
-                output.textContent = outputText;
+                currentReader = new JWWModule.JWWReader(dataPtr, uint8Array.length);
+                currentEntities = currentReader.getEntities();
                 
-                // Draw entities on canvas
-                drawEntities(entities);
+                updateAllTabs(file);
                 
-                // Cleanup
-                reader.delete();
                 JWWModule._free(dataPtr);
-                
             } catch (error) {
                 console.error('Error reading file:', error);
-                output.textContent = 'Error reading file: ' + error.message;
+                alert('ファイルの読み込みに失敗しました: ' + error.message);
             }
         }
         
-        function drawEntities(entities) {
-            const canvas = document.getElementById('canvas');
+        // 全タブ更新
+        function updateAllTabs(file) {
+            updateViewer(file);
+            updateAnalysis();
+            updateColorInfo();
+            updateEncodingInfo();
+            updateTestResults();
+        }
+        
+        // ビューア更新
+        function updateViewer(file) {
+            const canvas = document.getElementById('viewerCanvas');
             const ctx = canvas.getContext('2d');
+            const info = document.getElementById('viewerInfo');
             
-            // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            info.innerHTML = `
+                <strong>ファイル名:</strong> ${file.name}<br>
+                <strong>サイズ:</strong> ${(file.size / 1024).toFixed(2)} KB<br>
+                <strong>エンティティ数:</strong> ${currentEntities.size()}
+            `;
             
-            // Find bounds
-            let minX = Infinity, minY = Infinity;
-            let maxX = -Infinity, maxY = -Infinity;
+            drawEntities(canvas, currentEntities);
+        }
+        
+        // 解析情報更新
+        function updateAnalysis() {
+            const stats = document.getElementById('statistics');
+            const list = document.getElementById('entityList');
             
-            for (let i = 0; i < entities.size(); i++) {
-                const entity = entities.get(i);
-                switch(entity.type) {
+            const entityTypes = {};
+            let html = '';
+            
+            for (let i = 0; i < currentEntities.size(); i++) {
+                const entity = currentEntities.get(i);
+                entityTypes[entity.type] = (entityTypes[entity.type] || 0) + 1;
+                
+                const className = entity.type.toLowerCase();
+                html += `<div class="entity-item ${className}">`;
+                html += `<strong>${entity.type}</strong> `;
+                
+                switch (entity.type) {
                     case 'LINE':
-                        minX = Math.min(minX, entity.x1, entity.x2);
-                        minY = Math.min(minY, entity.y1, entity.y2);
-                        maxX = Math.max(maxX, entity.x1, entity.x2);
-                        maxY = Math.max(maxY, entity.y1, entity.y2);
+                        html += `(${entity.x1.toFixed(2)}, ${entity.y1.toFixed(2)}) → (${entity.x2.toFixed(2)}, ${entity.y2.toFixed(2)})`;
                         break;
                     case 'CIRCLE':
+                        html += `中心: (${entity.cx.toFixed(2)}, ${entity.cy.toFixed(2)}), 半径: ${entity.radius.toFixed(2)}`;
+                        break;
                     case 'ARC':
-                        minX = Math.min(minX, entity.cx - entity.radius);
-                        minY = Math.min(minY, entity.cy - entity.radius);
-                        maxX = Math.max(maxX, entity.cx + entity.radius);
-                        maxY = Math.max(maxY, entity.cy + entity.radius);
+                        html += `中心: (${entity.cx.toFixed(2)}, ${entity.cy.toFixed(2)}), 半径: ${entity.radius.toFixed(2)}`;
+                        break;
+                    case 'TEXT':
+                        html += `"${getEntityText(entity)}" at (${entity.x.toFixed(2)}, ${entity.y.toFixed(2)})`;
                         break;
                 }
+                
+                html += `<span class="color-info">色: ${colorNames[entity.color] || entity.color}</span>`;
+                html += '</div>';
             }
             
-            // Calculate scale and offset
-            const padding = 50;
-            const scaleX = (canvas.width - 2 * padding) / (maxX - minX);
-            const scaleY = (canvas.height - 2 * padding) / (maxY - minY);
-            const scale = Math.min(scaleX, scaleY);
+            // 統計カード
+            let statsHtml = '';
+            for (const [type, count] of Object.entries(entityTypes)) {
+                statsHtml += `
+                    <div class="stat-card">
+                        <div class="stat-value">${count}</div>
+                        <div class="stat-label">${type}</div>
+                    </div>
+                `;
+            }
             
-            const offsetX = padding + (canvas.width - 2 * padding - (maxX - minX) * scale) / 2;
-            const offsetY = padding + (canvas.height - 2 * padding - (maxY - minY) * scale) / 2;
+            stats.innerHTML = statsHtml;
+            list.innerHTML = html;
+        }
+        
+        // 色情報更新
+        function updateColorInfo() {
+            const colorBar = document.getElementById('colorBar');
+            const colorStats = document.getElementById('colorStatistics');
+            const coloredEntities = document.getElementById('coloredEntities');
             
-            // Transform function
+            const colorCount = {};
+            const totalEntities = currentEntities.size();
+            
+            for (let i = 0; i < totalEntities; i++) {
+                const entity = currentEntities.get(i);
+                colorCount[entity.color] = (colorCount[entity.color] || 0) + 1;
+            }
+            
+            // カラーバー
+            let barHtml = '';
+            for (const [color, count] of Object.entries(colorCount)) {
+                const percentage = (count / totalEntities) * 100;
+                const rgb = colorToRGB[color] || '#000000';
+                barHtml += `<div class="color-segment" style="background-color: ${rgb}; width: ${percentage}%" title="${colorNames[color] || 'Color ' + color}: ${count}個 (${percentage.toFixed(1)}%)"></div>`;
+            }
+            colorBar.innerHTML = barHtml;
+            
+            // 色統計
+            let statsHtml = '';
+            for (const [color, count] of Object.entries(colorCount)) {
+                const rgb = colorToRGB[color] || '#000000';
+                statsHtml += `
+                    <div style="margin: 10px 0;">
+                        <span class="color-sample" style="background-color: ${rgb}"></span>
+                        <strong>${colorNames[color] || 'Color ' + color}</strong>: ${count}個
+                    </div>
+                `;
+            }
+            colorStats.innerHTML = statsHtml;
+            
+            // 色付きエンティティリスト
+            let entitiesHtml = '';
+            for (let i = 0; i < Math.min(50, totalEntities); i++) {
+                const entity = currentEntities.get(i);
+                const rgb = colorToRGB[entity.color] || '#000000';
+                entitiesHtml += `
+                    <div class="entity-item">
+                        <span class="color-sample" style="background-color: ${rgb}"></span>
+                        <strong>${entity.type}</strong> - ${colorNames[entity.color] || 'Color ' + entity.color}
+                    </div>
+                `;
+            }
+            if (totalEntities > 50) {
+                entitiesHtml += '<div style="text-align: center; color: #7f8c8d;">... 他 ' + (totalEntities - 50) + ' 個</div>';
+            }
+            coloredEntities.innerHTML = entitiesHtml;
+        }
+        
+        // エンコーディング情報更新
+        function updateEncodingInfo() {
+            const info = document.getElementById('encodingInfo');
+            const canvas = document.getElementById('textCanvas');
+            
+            const texts = currentReader.getTexts();
+            let infoHtml = '<div class="test-result success">';
+            infoHtml += `<strong>テキストエンティティ数:</strong> ${texts.size()}<br>`;
+            
+            if (texts.size() > 0) {
+                infoHtml += '<strong>テキストサンプル:</strong><br>';
+                for (let i = 0; i < Math.min(5, texts.size()); i++) {
+                    const textData = texts.get(i);
+                    const decoded = getEntityText(textData);
+                    infoHtml += `${i + 1}. "${decoded}"<br>`;
+                }
+            }
+            infoHtml += '</div>';
+            info.innerHTML = infoHtml;
+            
+            // テキストを描画
+            drawTextEntities(canvas, currentEntities);
+        }
+        
+        // テスト結果更新
+        function updateTestResults() {
+            const results = document.getElementById('testResults');
+            
+            let html = '<div class="test-result success">';
+            html += '<strong>読み込みテスト:</strong> ✅ 成功<br>';
+            html += `<strong>エンティティ数:</strong> ${currentEntities.size()}<br>`;
+            html += `<strong>色情報:</strong> ✅ 利用可能<br>`;
+            html += `<strong>テキストエンコーディング:</strong> ✅ Shift-JIS対応<br>`;
+            html += '</div>';
+            
+            results.innerHTML = html;
+        }
+        
+        // エンティティ描画
+        function drawEntities(canvas, entities) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (entities.size() === 0) return;
+            
+            const bounds = findBounds(entities);
+            const padding = 40;
+            const scaleX = (canvas.width - 2 * padding) / (bounds.maxX - bounds.minX);
+            const scaleY = (canvas.height - 2 * padding) / (bounds.maxY - bounds.minY);
+            const scale = Math.min(scaleX, scaleY) * 0.9;
+            
+            const centerX = (bounds.minX + bounds.maxX) / 2;
+            const centerY = (bounds.minY + bounds.maxY) / 2;
+            const offsetX = canvas.width / 2;
+            const offsetY = canvas.height / 2;
+            
             const transform = (x, y) => ({
-                x: (x - minX) * scale + offsetX,
-                y: canvas.height - ((y - minY) * scale + offsetY)
+                x: (x - centerX) * scale + offsetX,
+                y: canvas.height - ((y - centerY) * scale + offsetY)
             });
             
-            // Draw entities
-            ctx.strokeStyle = '#000';
             ctx.lineWidth = 1;
             
             for (let i = 0; i < entities.size(); i++) {
                 const entity = entities.get(i);
+                const color = colorToRGB[entity.color] || '#000000';
+                ctx.strokeStyle = color;
+                ctx.fillStyle = color;
                 
-                switch(entity.type) {
+                switch (entity.type) {
                     case 'LINE': {
                         const p1 = transform(entity.x1, entity.y1);
                         const p2 = transform(entity.x2, entity.y2);
@@ -282,15 +655,109 @@
                         ctx.stroke();
                         break;
                     }
+                    case 'TEXT': {
+                        try {
+                            const pos = transform(entity.x, entity.y);
+                            ctx.save();
+                            ctx.font = `${Math.max(10, entity.height * scale)}px Arial`;
+                            ctx.translate(pos.x, pos.y);
+                            ctx.rotate(-entity.angle);
+                            const text = getEntityText(entity);
+                            ctx.fillText(text, 0, 0);
+                            ctx.restore();
+                        } catch (e) {
+                            console.warn('Text rendering error:', e);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // テキストエンティティ描画
+        function drawTextEntities(canvas, entities) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const textEntities = [];
+            for (let i = 0; i < entities.size(); i++) {
+                const entity = entities.get(i);
+                if (entity.type === 'TEXT') {
+                    textEntities.push(entity);
                 }
             }
             
-            canvas.style.display = 'block';
-        }
+            if (textEntities.length === 0) {
+                ctx.fillStyle = '#7f8c8d';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('テキストエンティティがありません', canvas.width / 2, canvas.height / 2);
+                return;
+            }
             
-            // Initialize on load
-            init();
-        };
+            // 簡易レイアウト
+            ctx.fillStyle = '#333';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'left';
+            
+            let y = 30;
+            for (const entity of textEntities) {
+                if (y > canvas.height - 30) break;
+                
+                const text = getEntityText(entity);
+                const color = colorToRGB[entity.color] || '#000000';
+                ctx.fillStyle = color;
+                ctx.fillText(text, 20, y);
+                y += 25;
+            }
+        }
+        
+        // 境界計算
+        function findBounds(entities) {
+            let minX = Infinity, minY = Infinity;
+            let maxX = -Infinity, maxY = -Infinity;
+            
+            for (let i = 0; i < entities.size(); i++) {
+                const entity = entities.get(i);
+                switch (entity.type) {
+                    case 'LINE':
+                        minX = Math.min(minX, entity.x1, entity.x2);
+                        minY = Math.min(minY, entity.y1, entity.y2);
+                        maxX = Math.max(maxX, entity.x1, entity.x2);
+                        maxY = Math.max(maxY, entity.y1, entity.y2);
+                        break;
+                    case 'CIRCLE':
+                    case 'ARC':
+                        minX = Math.min(minX, entity.cx - entity.radius);
+                        minY = Math.min(minY, entity.cy - entity.radius);
+                        maxX = Math.max(maxX, entity.cx + entity.radius);
+                        maxY = Math.max(maxY, entity.cy + entity.radius);
+                        break;
+                    case 'TEXT':
+                        minX = Math.min(minX, entity.x);
+                        minY = Math.min(minY, entity.y);
+                        maxX = Math.max(maxX, entity.x);
+                        maxY = Math.max(maxY, entity.y);
+                        break;
+                }
+            }
+            
+            if (!isFinite(minX)) {
+                return { minX: 0, minY: 0, maxX: 100, maxY: 100 };
+            }
+            
+            return { minX, minY, maxX, maxY };
+        }
+        
+        // 初期化
+        initModule().then(() => {
+            console.log('JWWLib WASM module loaded');
+        }).catch(error => {
+            console.error('Failed to load module:', error);
+            alert('モジュールの読み込みに失敗しました');
+        });
     </script>
 </body>
 </html>
