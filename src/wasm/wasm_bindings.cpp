@@ -15,22 +15,27 @@
 // Simple entity data structures for JavaScript
 struct JSLineData {
     double x1, y1, x2, y2;
+    int color;
 };
 
 struct JSCircleData {
     double cx, cy, radius;
+    int color;
 };
 
 struct JSArcData {
     double cx, cy, radius;
     double angle1, angle2;
+    int color;
 };
 
 struct JSTextData {
     double x, y;             // Text position
     double height;           // Text height
     double angle;            // Rotation angle in radians
-    std::string text;        // Text content
+    std::string text;        // Text content (UTF-8)
+    std::vector<uint8_t> textBytes;  // Original text bytes (Shift-JIS)
+    int color;
 };
 
 struct JSEllipseData {
@@ -38,10 +43,12 @@ struct JSEllipseData {
     double majorAxis;        // Major axis length
     double ratio;            // Ratio of minor to major axis
     double angle;            // Rotation angle in radians
+    int color;
 };
 
 struct JSPointData {
     double x, y, z;          // Point position
+    int color;
 };
 
 struct JSVertexData {
@@ -52,10 +59,12 @@ struct JSVertexData {
 struct JSPolylineData {
     std::vector<JSVertexData> vertices;  // Vertex list
     bool closed;                         // Is polyline closed
+    int color;
 };
 
 struct JSSolidData {
     double x[4], y[4], z[4];             // Four vertices (3 or 4 used)
+    int color;
     
     // Getter methods for Embind
     double getX(int index) const { return (index >= 0 && index < 4) ? x[index] : 0.0; }
@@ -71,9 +80,11 @@ struct JSMTextData {
     int drawingDirection;        // 描画方向
     int lineSpacingStyle;        // 行間スタイル
     double lineSpacingFactor;    // 行間係数
-    std::string text;            // テキスト内容
+    std::string text;            // テキスト内容 (UTF-8)
+    std::vector<uint8_t> textBytes;  // Original text bytes (Shift-JIS)
     std::string style;           // スタイル名
     double angle;                // 回転角度
+    int color;
 };
 
 struct JSDimensionData {
@@ -89,6 +100,7 @@ struct JSDimensionData {
     double dpx1, dpy1, dpz1;     // 定義点1
     double dpx2, dpy2, dpz2;     // 定義点2
     double dimLineAngle;         // 寸法線角度
+    int color;
 };
 
 // Unified entity structure
@@ -107,6 +119,7 @@ struct JSEntity {
     std::vector<JSVertexData> vertices; // For polyline vertices
     bool closed;                 // For polyline closed flag
     double solidX[4], solidY[4], solidZ[4]; // For solid vertices
+    int color;                   // Entity color
     
     // Getter methods for solid vertices
     double getSolidX(int index) const { return (index >= 0 && index < 4) ? solidX[index] : 0.0; }
@@ -134,6 +147,7 @@ private:
     std::vector<JSSolidData> solids;
     std::vector<JSMTextData> mtexts;
     std::vector<JSDimensionData> dimensions;
+    int currentColor = 256;  // Default to BYLAYER
     
 public:
     // Getters for JavaScript
@@ -164,23 +178,28 @@ public:
     }
     
     // DL_CreationInterface implementation
+    void setAttributes(const DL_Attributes& attrib) {
+        currentColor = attrib.getColor();
+        // Call parent implementation
+        DL_CreationInterface::setAttributes(attrib);
+    }
     virtual void addLayer(const DL_LayerData& /*data*/) override {}
     virtual void addBlock(const DL_BlockData& /*data*/) override {}
     virtual void endBlock() override {}
     virtual void addPoint(const DL_PointData& data) override {
-        points.push_back({data.x, data.y, data.z});
+        points.push_back({data.x, data.y, data.z, currentColor});
     }
     
     virtual void addLine(const DL_LineData& data) override {
-        lines.push_back({data.x1, data.y1, data.x2, data.y2});
+        lines.push_back({data.x1, data.y1, data.x2, data.y2, currentColor});
     }
     
     virtual void addArc(const DL_ArcData& data) override {
-        arcs.push_back({data.cx, data.cy, data.radius, data.angle1, data.angle2});
+        arcs.push_back({data.cx, data.cy, data.radius, data.angle1, data.angle2, currentColor});
     }
     
     virtual void addCircle(const DL_CircleData& data) override {
-        circles.push_back({data.cx, data.cy, data.radius});
+        circles.push_back({data.cx, data.cy, data.radius, currentColor});
     }
     
     virtual void addEllipse(const DL_EllipseData& data) override {
@@ -189,11 +208,12 @@ public:
         double dy = data.my - data.cy;
         double majorAxis = sqrt(dx * dx + dy * dy);
         double angle = atan2(dy, dx);
-        ellipses.push_back({data.cx, data.cy, majorAxis, data.ratio, angle});
+        ellipses.push_back({data.cx, data.cy, majorAxis, data.ratio, angle, currentColor});
     }
     virtual void addPolyline(const DL_PolylineData& data) override {
         JSPolylineData polyline;
         polyline.closed = (data.flags & 0x01) != 0;  // Check if closed
+        polyline.color = currentColor;
         polylines.push_back(polyline);
         currentPolyline = &polylines.back();
     }
@@ -215,9 +235,12 @@ public:
             solid.y[i] = data.y[i];
             solid.z[i] = data.z[i];
         }
+        solid.color = currentColor;
         solids.push_back(solid);
     }
     virtual void addMText(const DL_MTextData& data) override {
+        // Store both the text string and original bytes
+        std::vector<uint8_t> bytes(data.text.begin(), data.text.end());
         mtexts.push_back({
             data.ipx, data.ipy, data.ipz,
             data.height, data.width,
@@ -225,17 +248,23 @@ public:
             data.drawingDirection,
             data.lineSpacingStyle,
             data.lineSpacingFactor,
-            data.text, data.style,
-            data.angle
+            data.text, bytes, data.style,
+            data.angle,
+            currentColor
         });
     }
     virtual void addMTextChunk(const char* text) override {
         if (!mtexts.empty()) {
             mtexts.back().text += text;
+            // Also append to bytes
+            std::string str(text);
+            mtexts.back().textBytes.insert(mtexts.back().textBytes.end(), str.begin(), str.end());
         }
     }
     virtual void addText(const DL_TextData& data) override {
-        texts.push_back({data.ipx, data.ipy, data.height, data.angle * M_PI / 180.0, data.text});
+        // Store both the text string and original bytes
+        std::vector<uint8_t> bytes(data.text.begin(), data.text.end());
+        texts.push_back({data.ipx, data.ipy, data.height, data.angle * M_PI / 180.0, data.text, bytes, currentColor});
     }
     virtual void addDimAlign(const DL_DimensionData& data, const DL_DimAlignedData& edata) override {
         dimensions.push_back({
@@ -247,7 +276,8 @@ public:
             data.angle,
             edata.epx1, edata.epy1, edata.epz1,
             edata.epx2, edata.epy2, edata.epz2,
-            0.0 // dimLineAngle not used for aligned
+            0.0, // dimLineAngle not used for aligned
+            currentColor
         });
     }
     virtual void addDimLinear(const DL_DimensionData& data, const DL_DimLinearData& edata) override {
@@ -260,7 +290,8 @@ public:
             data.angle,
             edata.dpx1, edata.dpy1, edata.dpz1,
             edata.dpx2, edata.dpy2, edata.dpz2,
-            edata.angle
+            edata.angle,
+            currentColor
         });
     }
     virtual void addDimRadial(const DL_DimensionData& /*data*/, const DL_DimRadialData& /*edata*/) override {}
@@ -382,6 +413,7 @@ public:
             entity.angle1 = entity.angle2 = 0.0;
             entity.x = entity.y = entity.height = entity.angle = 0.0;
             entity.majorAxis = entity.ratio = 0.0;
+            entity.color = line.color;
             entities.push_back(entity);
         }
         
@@ -396,6 +428,7 @@ public:
             entity.angle1 = entity.angle2 = 0.0;
             entity.x = entity.y = entity.height = entity.angle = 0.0;
             entity.majorAxis = entity.ratio = 0.0;
+            entity.color = circle.color;
             entities.push_back(entity);
         }
         
@@ -411,6 +444,7 @@ public:
             entity.x1 = entity.y1 = entity.x2 = entity.y2 = 0.0;
             entity.x = entity.y = entity.height = 0.0;
             entity.angle = 0.0;
+            entity.color = arc.color;
             entities.push_back(entity);
         }
         
@@ -427,6 +461,7 @@ public:
             entity.cx = entity.cy = entity.radius = 0.0;
             entity.angle1 = entity.angle2 = 0.0;
             entity.majorAxis = entity.ratio = 0.0;
+            entity.color = textData.color;
             entities.push_back(entity);
         }
         
@@ -443,6 +478,7 @@ public:
             entity.x = entity.y = entity.height = 0.0;
             entity.radius = entity.angle1 = entity.angle2 = 0.0;
             entity.z = 0.0;
+            entity.color = ellipse.color;
             entities.push_back(entity);
         }
         
@@ -458,6 +494,7 @@ public:
             entity.angle1 = entity.angle2 = 0.0;
             entity.height = entity.angle = 0.0;
             entity.majorAxis = entity.ratio = 0.0;
+            entity.color = point.color;
             entities.push_back(entity);
         }
         
@@ -477,6 +514,7 @@ public:
             entity.majorAxis = entity.ratio = 0.0;
             entity.z = 0.0;
             entity.closed = false;
+            entity.color = solid.color;
             entities.push_back(entity);
         }
         
@@ -511,38 +549,45 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .field("x1", &JSLineData::x1)
         .field("y1", &JSLineData::y1)
         .field("x2", &JSLineData::x2)
-        .field("y2", &JSLineData::y2);
+        .field("y2", &JSLineData::y2)
+        .field("color", &JSLineData::color);
     
     value_object<JSCircleData>("CircleData")
         .field("cx", &JSCircleData::cx)
         .field("cy", &JSCircleData::cy)
-        .field("radius", &JSCircleData::radius);
+        .field("radius", &JSCircleData::radius)
+        .field("color", &JSCircleData::color);
     
     value_object<JSArcData>("ArcData")
         .field("cx", &JSArcData::cx)
         .field("cy", &JSArcData::cy)
         .field("radius", &JSArcData::radius)
         .field("angle1", &JSArcData::angle1)
-        .field("angle2", &JSArcData::angle2);
+        .field("angle2", &JSArcData::angle2)
+        .field("color", &JSArcData::color);
     
     value_object<JSTextData>("TextData")
         .field("x", &JSTextData::x)
         .field("y", &JSTextData::y)
         .field("height", &JSTextData::height)
         .field("angle", &JSTextData::angle)
-        .field("text", &JSTextData::text);
+        .field("text", &JSTextData::text)
+        .field("textBytes", &JSTextData::textBytes)
+        .field("color", &JSTextData::color);
     
     value_object<JSEllipseData>("EllipseData")
         .field("cx", &JSEllipseData::cx)
         .field("cy", &JSEllipseData::cy)
         .field("majorAxis", &JSEllipseData::majorAxis)
         .field("ratio", &JSEllipseData::ratio)
-        .field("angle", &JSEllipseData::angle);
+        .field("angle", &JSEllipseData::angle)
+        .field("color", &JSEllipseData::color);
     
     value_object<JSPointData>("PointData")
         .field("x", &JSPointData::x)
         .field("y", &JSPointData::y)
-        .field("z", &JSPointData::z);
+        .field("z", &JSPointData::z)
+        .field("color", &JSPointData::color);
     
     value_object<JSVertexData>("VertexData")
         .field("x", &JSVertexData::x)
@@ -552,12 +597,14 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
     
     value_object<JSPolylineData>("PolylineData")
         .field("vertices", &JSPolylineData::vertices)
-        .field("closed", &JSPolylineData::closed);
+        .field("closed", &JSPolylineData::closed)
+        .field("color", &JSPolylineData::color);
     
     class_<JSSolidData>("SolidData")
         .function("getX", &JSSolidData::getX)
         .function("getY", &JSSolidData::getY)
-        .function("getZ", &JSSolidData::getZ);
+        .function("getZ", &JSSolidData::getZ)
+        .property("color", &JSSolidData::color);
     
     value_object<JSMTextData>("MTextData")
         .field("x", &JSMTextData::x)
@@ -570,8 +617,10 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .field("lineSpacingStyle", &JSMTextData::lineSpacingStyle)
         .field("lineSpacingFactor", &JSMTextData::lineSpacingFactor)
         .field("text", &JSMTextData::text)
+        .field("textBytes", &JSMTextData::textBytes)
         .field("style", &JSMTextData::style)
-        .field("angle", &JSMTextData::angle);
+        .field("angle", &JSMTextData::angle)
+        .field("color", &JSMTextData::color);
     
     value_object<JSDimensionData>("DimensionData")
         .field("dpx", &JSDimensionData::dpx)
@@ -590,7 +639,8 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .field("dpx2", &JSDimensionData::dpx2)
         .field("dpy2", &JSDimensionData::dpy2)
         .field("dpz2", &JSDimensionData::dpz2)
-        .field("dimLineAngle", &JSDimensionData::dimLineAngle);
+        .field("dimLineAngle", &JSDimensionData::dimLineAngle)
+        .field("color", &JSDimensionData::color);
     
     // Unified entity structure
     class_<JSEntity>("Entity")
@@ -614,6 +664,7 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .property("z", &JSEntity::z)
         .property("vertices", &JSEntity::vertices)
         .property("closed", &JSEntity::closed)
+        .property("color", &JSEntity::color)
         .function("getSolidX", &JSEntity::getSolidX)
         .function("getSolidY", &JSEntity::getSolidY)
         .function("getSolidZ", &JSEntity::getSolidZ);
