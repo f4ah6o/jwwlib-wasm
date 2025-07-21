@@ -40,6 +40,57 @@ struct JSEllipseData {
     double angle;            // Rotation angle in radians
 };
 
+struct JSPointData {
+    double x, y, z;          // Point position
+};
+
+struct JSVertexData {
+    double x, y, z;          // Vertex position
+    double bulge;            // Bulge for arc segments (0 for lines)
+};
+
+struct JSPolylineData {
+    std::vector<JSVertexData> vertices;  // Vertex list
+    bool closed;                         // Is polyline closed
+};
+
+struct JSSolidData {
+    double x[4], y[4], z[4];             // Four vertices (3 or 4 used)
+    
+    // Getter methods for Embind
+    double getX(int index) const { return (index >= 0 && index < 4) ? x[index] : 0.0; }
+    double getY(int index) const { return (index >= 0 && index < 4) ? y[index] : 0.0; }
+    double getZ(int index) const { return (index >= 0 && index < 4) ? z[index] : 0.0; }
+};
+
+struct JSMTextData {
+    double x, y, z;              // 挿入点
+    double height;               // テキスト高さ
+    double width;                // テキストボックス幅
+    int attachmentPoint;         // アタッチメントポイント（1-9）
+    int drawingDirection;        // 描画方向
+    int lineSpacingStyle;        // 行間スタイル
+    double lineSpacingFactor;    // 行間係数
+    std::string text;            // テキスト内容
+    std::string style;           // スタイル名
+    double angle;                // 回転角度
+};
+
+struct JSDimensionData {
+    // 共通フィールド
+    double dpx, dpy, dpz;        // 定義点
+    double mpx, mpy, mpz;        // テキスト中点
+    int type;                    // 寸法タイプ (0=linear, 1=aligned, 2=radial, etc.)
+    int attachmentPoint;         // テキスト配置
+    std::string text;            // 寸法テキスト
+    double angle;                // テキスト角度
+    
+    // Linear寸法用
+    double dpx1, dpy1, dpz1;     // 定義点1
+    double dpx2, dpy2, dpz2;     // 定義点2
+    double dimLineAngle;         // 寸法線角度
+};
+
 // Unified entity structure
 struct JSEntity {
     std::string type;
@@ -52,6 +103,15 @@ struct JSEntity {
     std::string text;            // For text content
     double majorAxis;            // For ellipse major axis
     double ratio;                // For ellipse axis ratio
+    double z;                    // For point z coordinate
+    std::vector<JSVertexData> vertices; // For polyline vertices
+    bool closed;                 // For polyline closed flag
+    double solidX[4], solidY[4], solidZ[4]; // For solid vertices
+    
+    // Getter methods for solid vertices
+    double getSolidX(int index) const { return (index >= 0 && index < 4) ? solidX[index] : 0.0; }
+    double getSolidY(int index) const { return (index >= 0 && index < 4) ? solidY[index] : 0.0; }
+    double getSolidZ(int index) const { return (index >= 0 && index < 4) ? solidZ[index] : 0.0; }
 };
 
 // Header information
@@ -68,6 +128,12 @@ private:
     std::vector<JSArcData> arcs;
     std::vector<JSTextData> texts;
     std::vector<JSEllipseData> ellipses;
+    std::vector<JSPointData> points;
+    std::vector<JSPolylineData> polylines;
+    JSPolylineData* currentPolyline = nullptr;
+    std::vector<JSSolidData> solids;
+    std::vector<JSMTextData> mtexts;
+    std::vector<JSDimensionData> dimensions;
     
 public:
     // Getters for JavaScript
@@ -76,6 +142,11 @@ public:
     const std::vector<JSArcData>& getArcs() const { return arcs; }
     const std::vector<JSTextData>& getTexts() const { return texts; }
     const std::vector<JSEllipseData>& getEllipses() const { return ellipses; }
+    const std::vector<JSPointData>& getPoints() const { return points; }
+    const std::vector<JSPolylineData>& getPolylines() const { return polylines; }
+    const std::vector<JSSolidData>& getSolids() const { return solids; }
+    const std::vector<JSMTextData>& getMTexts() const { return mtexts; }
+    const std::vector<JSDimensionData>& getDimensions() const { return dimensions; }
     
     // Clear all data
     void clear() {
@@ -84,13 +155,21 @@ public:
         arcs.clear();
         texts.clear();
         ellipses.clear();
+        points.clear();
+        polylines.clear();
+        currentPolyline = nullptr;
+        solids.clear();
+        mtexts.clear();
+        dimensions.clear();
     }
     
     // DL_CreationInterface implementation
     virtual void addLayer(const DL_LayerData& /*data*/) override {}
     virtual void addBlock(const DL_BlockData& /*data*/) override {}
     virtual void endBlock() override {}
-    virtual void addPoint(const DL_PointData& /*data*/) override {}
+    virtual void addPoint(const DL_PointData& data) override {
+        points.push_back({data.x, data.y, data.z});
+    }
     
     virtual void addLine(const DL_LineData& data) override {
         lines.push_back({data.x1, data.y1, data.x2, data.y2});
@@ -112,22 +191,78 @@ public:
         double angle = atan2(dy, dx);
         ellipses.push_back({data.cx, data.cy, majorAxis, data.ratio, angle});
     }
-    virtual void addPolyline(const DL_PolylineData& /*data*/) override {}
-    virtual void addVertex(const DL_VertexData& /*data*/) override {}
+    virtual void addPolyline(const DL_PolylineData& data) override {
+        JSPolylineData polyline;
+        polyline.closed = (data.flags & 0x01) != 0;  // Check if closed
+        polylines.push_back(polyline);
+        currentPolyline = &polylines.back();
+    }
+    virtual void addVertex(const DL_VertexData& data) override {
+        if (currentPolyline) {
+            currentPolyline->vertices.push_back({data.x, data.y, data.z, data.bulge});
+        }
+    }
     virtual void addSpline(const DL_SplineData& /*data*/) override {}
     virtual void addControlPoint(const DL_ControlPointData& /*data*/) override {}
     virtual void addKnot(const DL_KnotData& /*data*/) override {}
     virtual void addInsert(const DL_InsertData& /*data*/) override {}
     virtual void addTrace(const DL_TraceData& /*data*/) override {}
     virtual void add3dFace(const DL_3dFaceData& /*data*/) override {}
-    virtual void addSolid(const DL_SolidData& /*data*/) override {}
-    virtual void addMText(const DL_MTextData& /*data*/) override {}
-    virtual void addMTextChunk(const char* /*text*/) override {}
+    virtual void addSolid(const DL_SolidData& data) override {
+        JSSolidData solid;
+        for (int i = 0; i < 4; i++) {
+            solid.x[i] = data.x[i];
+            solid.y[i] = data.y[i];
+            solid.z[i] = data.z[i];
+        }
+        solids.push_back(solid);
+    }
+    virtual void addMText(const DL_MTextData& data) override {
+        mtexts.push_back({
+            data.ipx, data.ipy, data.ipz,
+            data.height, data.width,
+            data.attachmentPoint,
+            data.drawingDirection,
+            data.lineSpacingStyle,
+            data.lineSpacingFactor,
+            data.text, data.style,
+            data.angle
+        });
+    }
+    virtual void addMTextChunk(const char* text) override {
+        if (!mtexts.empty()) {
+            mtexts.back().text += text;
+        }
+    }
     virtual void addText(const DL_TextData& data) override {
         texts.push_back({data.ipx, data.ipy, data.height, data.angle * M_PI / 180.0, data.text});
     }
-    virtual void addDimAlign(const DL_DimensionData& /*data*/, const DL_DimAlignedData& /*edata*/) override {}
-    virtual void addDimLinear(const DL_DimensionData& /*data*/, const DL_DimLinearData& /*edata*/) override {}
+    virtual void addDimAlign(const DL_DimensionData& data, const DL_DimAlignedData& edata) override {
+        dimensions.push_back({
+            data.dpx, data.dpy, data.dpz,
+            data.mpx, data.mpy, data.mpz,
+            1, // type = aligned
+            data.attachmentPoint,
+            data.text,
+            data.angle,
+            edata.epx1, edata.epy1, edata.epz1,
+            edata.epx2, edata.epy2, edata.epz2,
+            0.0 // dimLineAngle not used for aligned
+        });
+    }
+    virtual void addDimLinear(const DL_DimensionData& data, const DL_DimLinearData& edata) override {
+        dimensions.push_back({
+            data.dpx, data.dpy, data.dpz,
+            data.mpx, data.mpy, data.mpz,
+            0, // type = linear
+            data.attachmentPoint,
+            data.text,
+            data.angle,
+            edata.dpx1, edata.dpy1, edata.dpz1,
+            edata.dpx2, edata.dpy2, edata.dpz2,
+            edata.angle
+        });
+    }
     virtual void addDimRadial(const DL_DimensionData& /*data*/, const DL_DimRadialData& /*edata*/) override {}
     virtual void addDimDiametric(const DL_DimensionData& /*data*/, const DL_DimDiametricData& /*edata*/) override {}
     virtual void addDimAngular(const DL_DimensionData& /*data*/, const DL_DimAngularData& /*edata*/) override {}
@@ -145,7 +280,9 @@ public:
     virtual void setVariableDouble(const char* /*key*/, double /*value*/, int /*code*/) override {}
     virtual void setVariableVector(const char* /*key*/, double /*v1*/, double /*v2*/, double /*v3*/, int /*code*/) override {}
     virtual void addComment(const char* /*comment*/) override {}
-    virtual void endSequence() override {}
+    virtual void endSequence() override {
+        currentPolyline = nullptr;
+    }
     virtual void endEntity() override {}
 };
 
@@ -207,6 +344,26 @@ public:
     
     const std::vector<JSEllipseData>& getEllipses() const { 
         return creationInterface->getEllipses(); 
+    }
+    
+    const std::vector<JSPointData>& getPoints() const { 
+        return creationInterface->getPoints(); 
+    }
+    
+    const std::vector<JSPolylineData>& getPolylines() const { 
+        return creationInterface->getPolylines(); 
+    }
+    
+    const std::vector<JSSolidData>& getSolids() const { 
+        return creationInterface->getSolids(); 
+    }
+    
+    const std::vector<JSMTextData>& getMTexts() const { 
+        return creationInterface->getMTexts(); 
+    }
+    
+    const std::vector<JSDimensionData>& getDimensions() const { 
+        return creationInterface->getDimensions(); 
     }
     
     // Get all entities in a unified format
@@ -285,6 +442,41 @@ public:
             entity.x1 = entity.y1 = entity.x2 = entity.y2 = 0.0;
             entity.x = entity.y = entity.height = 0.0;
             entity.radius = entity.angle1 = entity.angle2 = 0.0;
+            entity.z = 0.0;
+            entities.push_back(entity);
+        }
+        
+        // Add points
+        for (const auto& point : creationInterface->getPoints()) {
+            JSEntity entity;
+            entity.type = "POINT";
+            entity.x = point.x;
+            entity.y = point.y;
+            entity.z = point.z;
+            entity.x1 = entity.y1 = entity.x2 = entity.y2 = 0.0;
+            entity.cx = entity.cy = entity.radius = 0.0;
+            entity.angle1 = entity.angle2 = 0.0;
+            entity.height = entity.angle = 0.0;
+            entity.majorAxis = entity.ratio = 0.0;
+            entities.push_back(entity);
+        }
+        
+        // Add solids
+        for (const auto& solid : creationInterface->getSolids()) {
+            JSEntity entity;
+            entity.type = "SOLID";
+            for (int i = 0; i < 4; i++) {
+                entity.solidX[i] = solid.x[i];
+                entity.solidY[i] = solid.y[i];
+                entity.solidZ[i] = solid.z[i];
+            }
+            entity.x1 = entity.y1 = entity.x2 = entity.y2 = 0.0;
+            entity.cx = entity.cy = entity.radius = 0.0;
+            entity.angle1 = entity.angle2 = 0.0;
+            entity.x = entity.y = entity.height = entity.angle = 0.0;
+            entity.majorAxis = entity.ratio = 0.0;
+            entity.z = 0.0;
+            entity.closed = false;
             entities.push_back(entity);
         }
         
@@ -299,7 +491,12 @@ public:
                            creationInterface->getCircles().size() + 
                            creationInterface->getArcs().size() +
                            creationInterface->getTexts().size() +
-                           creationInterface->getEllipses().size();
+                           creationInterface->getEllipses().size() +
+                           creationInterface->getPoints().size() +
+                           creationInterface->getPolylines().size() +
+                           creationInterface->getSolids().size() +
+                           creationInterface->getMTexts().size() +
+                           creationInterface->getDimensions().size();
         return header;
     }
 };
@@ -342,25 +539,84 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .field("ratio", &JSEllipseData::ratio)
         .field("angle", &JSEllipseData::angle);
     
+    value_object<JSPointData>("PointData")
+        .field("x", &JSPointData::x)
+        .field("y", &JSPointData::y)
+        .field("z", &JSPointData::z);
+    
+    value_object<JSVertexData>("VertexData")
+        .field("x", &JSVertexData::x)
+        .field("y", &JSVertexData::y)
+        .field("z", &JSVertexData::z)
+        .field("bulge", &JSVertexData::bulge);
+    
+    value_object<JSPolylineData>("PolylineData")
+        .field("vertices", &JSPolylineData::vertices)
+        .field("closed", &JSPolylineData::closed);
+    
+    class_<JSSolidData>("SolidData")
+        .function("getX", &JSSolidData::getX)
+        .function("getY", &JSSolidData::getY)
+        .function("getZ", &JSSolidData::getZ);
+    
+    value_object<JSMTextData>("MTextData")
+        .field("x", &JSMTextData::x)
+        .field("y", &JSMTextData::y)
+        .field("z", &JSMTextData::z)
+        .field("height", &JSMTextData::height)
+        .field("width", &JSMTextData::width)
+        .field("attachmentPoint", &JSMTextData::attachmentPoint)
+        .field("drawingDirection", &JSMTextData::drawingDirection)
+        .field("lineSpacingStyle", &JSMTextData::lineSpacingStyle)
+        .field("lineSpacingFactor", &JSMTextData::lineSpacingFactor)
+        .field("text", &JSMTextData::text)
+        .field("style", &JSMTextData::style)
+        .field("angle", &JSMTextData::angle);
+    
+    value_object<JSDimensionData>("DimensionData")
+        .field("dpx", &JSDimensionData::dpx)
+        .field("dpy", &JSDimensionData::dpy)
+        .field("dpz", &JSDimensionData::dpz)
+        .field("mpx", &JSDimensionData::mpx)
+        .field("mpy", &JSDimensionData::mpy)
+        .field("mpz", &JSDimensionData::mpz)
+        .field("type", &JSDimensionData::type)
+        .field("attachmentPoint", &JSDimensionData::attachmentPoint)
+        .field("text", &JSDimensionData::text)
+        .field("angle", &JSDimensionData::angle)
+        .field("dpx1", &JSDimensionData::dpx1)
+        .field("dpy1", &JSDimensionData::dpy1)
+        .field("dpz1", &JSDimensionData::dpz1)
+        .field("dpx2", &JSDimensionData::dpx2)
+        .field("dpy2", &JSDimensionData::dpy2)
+        .field("dpz2", &JSDimensionData::dpz2)
+        .field("dimLineAngle", &JSDimensionData::dimLineAngle);
+    
     // Unified entity structure
-    value_object<JSEntity>("Entity")
-        .field("type", &JSEntity::type)
-        .field("x1", &JSEntity::x1)
-        .field("y1", &JSEntity::y1)
-        .field("x2", &JSEntity::x2)
-        .field("y2", &JSEntity::y2)
-        .field("cx", &JSEntity::cx)
-        .field("cy", &JSEntity::cy)
-        .field("radius", &JSEntity::radius)
-        .field("angle1", &JSEntity::angle1)
-        .field("angle2", &JSEntity::angle2)
-        .field("x", &JSEntity::x)
-        .field("y", &JSEntity::y)
-        .field("height", &JSEntity::height)
-        .field("angle", &JSEntity::angle)
-        .field("text", &JSEntity::text)
-        .field("majorAxis", &JSEntity::majorAxis)
-        .field("ratio", &JSEntity::ratio);
+    class_<JSEntity>("Entity")
+        .property("type", &JSEntity::type)
+        .property("x1", &JSEntity::x1)
+        .property("y1", &JSEntity::y1)
+        .property("x2", &JSEntity::x2)
+        .property("y2", &JSEntity::y2)
+        .property("cx", &JSEntity::cx)
+        .property("cy", &JSEntity::cy)
+        .property("radius", &JSEntity::radius)
+        .property("angle1", &JSEntity::angle1)
+        .property("angle2", &JSEntity::angle2)
+        .property("x", &JSEntity::x)
+        .property("y", &JSEntity::y)
+        .property("height", &JSEntity::height)
+        .property("angle", &JSEntity::angle)
+        .property("text", &JSEntity::text)
+        .property("majorAxis", &JSEntity::majorAxis)
+        .property("ratio", &JSEntity::ratio)
+        .property("z", &JSEntity::z)
+        .property("vertices", &JSEntity::vertices)
+        .property("closed", &JSEntity::closed)
+        .function("getSolidX", &JSEntity::getSolidX)
+        .function("getSolidY", &JSEntity::getSolidY)
+        .function("getSolidZ", &JSEntity::getSolidZ);
     
     // Header structure
     value_object<JSHeader>("Header")
@@ -373,6 +629,12 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
     register_vector<JSArcData>("ArcDataVector");
     register_vector<JSTextData>("TextDataVector");
     register_vector<JSEllipseData>("EllipseDataVector");
+    register_vector<JSPointData>("PointDataVector");
+    register_vector<JSVertexData>("VertexDataVector");
+    register_vector<JSPolylineData>("PolylineDataVector");
+    register_vector<JSSolidData>("SolidDataVector");
+    register_vector<JSMTextData>("MTextDataVector");
+    register_vector<JSDimensionData>("DimensionDataVector");
     register_vector<JSEntity>("EntityVector");
     register_vector<uint8_t>("Uint8Vector");
     
@@ -386,6 +648,11 @@ EMSCRIPTEN_BINDINGS(jwwlib_module) {
         .function("getArcs", &JWWReader::getArcs)
         .function("getTexts", &JWWReader::getTexts)
         .function("getEllipses", &JWWReader::getEllipses)
+        .function("getPoints", &JWWReader::getPoints)
+        .function("getPolylines", &JWWReader::getPolylines)
+        .function("getSolids", &JWWReader::getSolids)
+        .function("getMTexts", &JWWReader::getMTexts)
+        .function("getDimensions", &JWWReader::getDimensions)
         .function("getEntities", &JWWReader::getEntities)
         .function("getHeader", &JWWReader::getHeader);
 }
