@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWW New Entity Types Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .entity-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #007bff;
+        }
+        .code-block {
+            background: #272822;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        .output {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #4caf50;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        .stats-table th, .stats-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .stats-table th {
+            background: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JWW New Entity Types Example</h1>
+        <p>This example demonstrates the new entity types support in jwwlib-wasm, including blocks, inserts, hatches, dimensions, leaders, and images.</p>
+    </div>
+
+    <div class="container">
+        <h2>1. Block and Insert Entities</h2>
+        <div class="entity-section">
+            <h3>Sample Code:</h3>
+            <div class="code-block">// Load a JWW file with blocks
+const fileInput = document.getElementById('file-input');
+const file = fileInput.files[0];
+const arrayBuffer = await file.arrayBuffer();
+const fileData = new Uint8Array(arrayBuffer);
+
+// Allocate memory and create reader
+const dataPtr = Module._malloc(fileData.length);
+Module.HEAPU8.set(fileData, dataPtr);
+const reader = new Module.JWWReader(dataPtr, fileData.length);
+
+// Get blocks and inserts
+const blocks = reader.getBlocks();
+const inserts = reader.getInserts();
+
+console.log(`Found ${blocks.size()} block definitions`);
+console.log(`Found ${inserts.size()} block inserts`);
+
+// Process blocks
+for (let i = 0; i < blocks.size(); i++) {
+    const block = blocks.get(i);
+    console.log(`Block: ${block.name} at (${block.baseX}, ${block.baseY})`);
+}
+
+// Process inserts
+for (let i = 0; i < inserts.size(); i++) {
+    const insert = inserts.get(i);
+    console.log(`Insert: ${insert.blockName} at (${insert.ipx}, ${insert.ipy})`);
+    console.log(`  Scale: (${insert.sx}, ${insert.sy}), Angle: ${insert.angle}`);
+}</div>
+            <button onclick="loadBlockExample()">Run Block Example</button>
+            <div id="block-output" class="output" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>2. Hatch Entities</h2>
+        <div class="entity-section">
+            <h3>Sample Code:</h3>
+            <div class="code-block">// Get hatch entities
+const hatches = reader.getHatches();
+console.log(`Found ${hatches.size()} hatch entities`);
+
+for (let i = 0; i < hatches.size(); i++) {
+    const hatch = hatches.get(i);
+    console.log(`Hatch ${i}:`);
+    console.log(`  Pattern: ${hatch.patternName}`);
+    console.log(`  Solid: ${hatch.solid}`);
+    console.log(`  Angle: ${hatch.angle * 180 / Math.PI}°`);
+    console.log(`  Scale: ${hatch.scale}`);
+    console.log(`  Loops: ${hatch.loops.size()}`);
+    
+    // Process hatch loops
+    for (let j = 0; j < hatch.loops.size(); j++) {
+        const loop = hatch.loops.get(j);
+        console.log(`    Loop ${j}: ${loop.edges.size()} edges`);
+    }
+}</div>
+            <button onclick="loadHatchExample()">Run Hatch Example</button>
+            <div id="hatch-output" class="output" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>3. Extended Dimension Types</h2>
+        <div class="entity-section">
+            <h3>Sample Code:</h3>
+            <div class="code-block">// Get dimension entities
+const dimensions = reader.getDimensions();
+console.log(`Found ${dimensions.size()} dimension entities`);
+
+// Dimension type names
+const dimTypes = ['LINEAR', 'ALIGNED', 'RADIAL', 'DIAMETRIC', 'ANGULAR', 'ANGULAR3P', 'ORDINATE'];
+
+for (let i = 0; i < dimensions.size(); i++) {
+    const dim = dimensions.get(i);
+    const typeName = dimTypes[dim.type] || 'UNKNOWN';
+    
+    console.log(`Dimension ${i}:`);
+    console.log(`  Type: ${typeName}`);
+    console.log(`  Text: ${dim.text}`);
+    console.log(`  Definition point: (${dim.dpx}, ${dim.dpy})`);
+    console.log(`  Text position: (${dim.mpx}, ${dim.mpy})`);
+    
+    // Additional data for specific types
+    if (dim.type >= 2 && dim.type <= 6) {
+        console.log(`  Additional points: (${dim.dpx1}, ${dim.dpy1}) to (${dim.dpx2}, ${dim.dpy2})`);
+    }
+}</div>
+            <button onclick="loadDimensionExample()">Run Dimension Example</button>
+            <div id="dimension-output" class="output" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>4. Leader and Image Entities</h2>
+        <div class="entity-section">
+            <h3>Sample Code:</h3>
+            <div class="code-block">// Get leader entities
+const leaders = reader.getLeaders();
+console.log(`Found ${leaders.size()} leader entities`);
+
+for (let i = 0; i < leaders.size(); i++) {
+    const leader = leaders.get(i);
+    console.log(`Leader ${i}:`);
+    console.log(`  Arrow head: ${leader.arrowHeadFlag}`);
+    console.log(`  Path type: ${leader.pathType === 0 ? 'Straight' : 'Spline'}`);
+    console.log(`  Vertices: ${leader.vertices.size()}`);
+    
+    for (let j = 0; j < leader.vertices.size(); j++) {
+        const vertex = leader.vertices.get(j);
+        console.log(`    Vertex ${j}: (${vertex.x}, ${vertex.y})`);
+    }
+}
+
+// Get image entities
+const images = reader.getImages();
+const imageDefs = reader.getImageDefs();
+console.log(`Found ${images.size()} images with ${imageDefs.size()} definitions`);
+
+for (let i = 0; i < images.size(); i++) {
+    const image = images.get(i);
+    console.log(`Image ${i}:`);
+    console.log(`  Position: (${image.ipx}, ${image.ipy})`);
+    console.log(`  Size: ${image.width} x ${image.height}`);
+    console.log(`  Brightness: ${image.brightness}, Contrast: ${image.contrast}`);
+}</div>
+            <button onclick="loadLeaderImageExample()">Run Leader/Image Example</button>
+            <div id="leader-output" class="output" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>5. Memory Management and Performance</h2>
+        <div class="entity-section">
+            <h3>Progress Callback Example:</h3>
+            <div class="code-block">// Create reader with progress callback
+const progressCallback = (current, total) => {
+    const percentage = (current / total * 100).toFixed(1);
+    console.log(`Progress: ${percentage}% (${current}/${total})`);
+    updateProgressBar(percentage);
+};
+
+// Load file with progress tracking
+const reader = new Module.JWWReader(dataPtr, fileData.length, progressCallback);
+
+// Get memory usage
+const memoryUsage = reader.getMemoryUsage();
+console.log(`Memory usage: ${(memoryUsage / 1024 / 1024).toFixed(2)} MB`);
+
+// Get entity statistics
+const stats = reader.getEntityStats();
+for (const [type, count] of Object.entries(stats)) {
+    console.log(`${type}: ${count}`);
+}</div>
+            <button onclick="loadPerformanceExample()">Run Performance Example</button>
+            <div class="progress" id="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div id="performance-output" class="output" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>6. Error Handling</h2>
+        <div class="entity-section">
+            <h3>Sample Code:</h3>
+            <div class="code-block">// Get parsing errors
+const errors = reader.getParsingErrors();
+
+if (errors.size() > 0) {
+    console.warn(`Found ${errors.size()} parsing errors:`);
+    
+    for (let i = 0; i < errors.size(); i++) {
+        const error = errors.get(i);
+        const errorTypes = [
+            'NONE', 'INVALID_BLOCK_REFERENCE', 'INVALID_IMAGE_REFERENCE',
+            'INVALID_HATCH_BOUNDARY', 'INVALID_LEADER_PATH', 
+            'INVALID_DIMENSION_DATA', 'MEMORY_ALLOCATION_FAILED',
+            'UNKNOWN_ENTITY_TYPE'
+        ];
+        
+        console.warn(`Error ${i}:`);
+        console.warn(`  Type: ${errorTypes[error.type]}`);
+        console.warn(`  Message: ${error.message}`);
+        console.warn(`  Entity: ${error.entityType}`);
+        if (error.lineNumber > 0) {
+            console.warn(`  Line: ${error.lineNumber}`);
+        }
+    }
+}</div>
+            <button onclick="loadErrorExample()">Run Error Handling Example</button>
+            <div id="error-output" class="output" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>File Input</h2>
+        <input type="file" id="file-input" accept=".jww">
+        <button onclick="loadFile()">Load JWW File</button>
+        <div id="file-info" class="output" style="display:none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>Entity Statistics</h2>
+        <table class="stats-table" id="stats-table" style="display:none;">
+            <thead>
+                <tr>
+                    <th>Entity Type</th>
+                    <th>Count</th>
+                    <th>Memory (estimated)</th>
+                </tr>
+            </thead>
+            <tbody id="stats-body">
+            </tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        let Module;
+        let currentReader;
+
+        // Initialize the module
+        async function initModule() {
+            try {
+                Module = await createJWWModule();
+                console.log('JWW module loaded successfully');
+            } catch (error) {
+                console.error('Failed to load module:', error);
+                showError('Failed to load WASM module: ' + error.message);
+            }
+        }
+
+        // Load file
+        window.loadFile = async function() {
+            const fileInput = document.getElementById('file-input');
+            if (!fileInput.files.length) {
+                showError('Please select a JWW file');
+                return;
+            }
+
+            try {
+                const file = fileInput.files[0];
+                const arrayBuffer = await file.arrayBuffer();
+                const fileData = new Uint8Array(arrayBuffer);
+
+                // Clean up previous reader
+                if (currentReader) {
+                    currentReader.delete();
+                }
+
+                // Create reader with progress callback
+                const dataPtr = Module._malloc(fileData.length);
+                Module.HEAPU8.set(fileData, dataPtr);
+
+                const progressCallback = Module.addFunction((current, total) => {
+                    const percentage = (current / total * 100).toFixed(1);
+                    updateProgressBar(percentage);
+                }, 'vii');
+
+                currentReader = new Module.JWWReader(dataPtr, fileData.length, progressCallback);
+                Module._free(dataPtr);
+                Module.removeFunction(progressCallback);
+
+                // Show file info
+                showFileInfo(file, currentReader);
+                showStatistics(currentReader);
+
+            } catch (error) {
+                showError('Error loading file: ' + error.message);
+            }
+        };
+
+        // Show file information
+        function showFileInfo(file, reader) {
+            const info = document.getElementById('file-info');
+            const header = reader.getHeader();
+            const memUsage = reader.getMemoryUsage();
+            
+            info.textContent = `File: ${file.name}
+Size: ${(file.size / 1024).toFixed(2)} KB
+Entities: ${header.entityCount}
+Memory Usage: ${(memUsage / 1024 / 1024).toFixed(2)} MB`;
+            info.style.display = 'block';
+        }
+
+        // Show entity statistics
+        function showStatistics(reader) {
+            const stats = reader.getEntityStats();
+            const tbody = document.getElementById('stats-body');
+            tbody.innerHTML = '';
+
+            const entitySizes = {
+                lines: 48, circles: 32, arcs: 48, texts: 64,
+                polylines: 80, blocks: 128, inserts: 96,
+                hatches: 256, leaders: 128, images: 256
+            };
+
+            for (const [type, count] of Object.entries(stats)) {
+                if (count > 0) {
+                    const row = tbody.insertRow();
+                    row.insertCell(0).textContent = type;
+                    row.insertCell(1).textContent = count;
+                    const memSize = (count * (entitySizes[type] || 64)) / 1024;
+                    row.insertCell(2).textContent = `${memSize.toFixed(2)} KB`;
+                }
+            }
+
+            document.getElementById('stats-table').style.display = 'table';
+        }
+
+        // Example functions
+        window.loadBlockExample = function() {
+            if (!currentReader) {
+                showError('Please load a JWW file first');
+                return;
+            }
+
+            const output = document.getElementById('block-output');
+            let text = '';
+
+            const blocks = currentReader.getBlocks();
+            const inserts = currentReader.getInserts();
+
+            text += `Found ${blocks.size()} block definitions\n`;
+            text += `Found ${inserts.size()} block inserts\n\n`;
+
+            for (let i = 0; i < blocks.size() && i < 10; i++) {
+                const block = blocks.get(i);
+                text += `Block: ${block.name} at (${block.baseX.toFixed(2)}, ${block.baseY.toFixed(2)})\n`;
+            }
+
+            if (blocks.size() > 10) text += `... and ${blocks.size() - 10} more blocks\n`;
+            text += '\n';
+
+            for (let i = 0; i < inserts.size() && i < 10; i++) {
+                const insert = inserts.get(i);
+                text += `Insert: ${insert.blockName} at (${insert.ipx.toFixed(2)}, ${insert.ipy.toFixed(2)})\n`;
+                text += `  Scale: (${insert.sx}, ${insert.sy}), Angle: ${(insert.angle * 180 / Math.PI).toFixed(1)}°\n`;
+            }
+
+            if (inserts.size() > 10) text += `... and ${inserts.size() - 10} more inserts\n`;
+
+            output.textContent = text;
+            output.style.display = 'block';
+        };
+
+        window.loadHatchExample = function() {
+            if (!currentReader) {
+                showError('Please load a JWW file first');
+                return;
+            }
+
+            const output = document.getElementById('hatch-output');
+            let text = '';
+
+            const hatches = currentReader.getHatches();
+            text += `Found ${hatches.size()} hatch entities\n\n`;
+
+            for (let i = 0; i < hatches.size() && i < 5; i++) {
+                const hatch = hatches.get(i);
+                text += `Hatch ${i}:\n`;
+                text += `  Pattern: ${hatch.patternName}\n`;
+                text += `  Solid: ${hatch.solid}\n`;
+                text += `  Angle: ${(hatch.angle * 180 / Math.PI).toFixed(1)}°\n`;
+                text += `  Scale: ${hatch.scale}\n`;
+                text += `  Loops: ${hatch.loops.size()}\n`;
+                
+                for (let j = 0; j < hatch.loops.size() && j < 3; j++) {
+                    const loop = hatch.loops.get(j);
+                    text += `    Loop ${j}: ${loop.edges.size()} edges\n`;
+                }
+                text += '\n';
+            }
+
+            if (hatches.size() > 5) text += `... and ${hatches.size() - 5} more hatches\n`;
+
+            output.textContent = text;
+            output.style.display = 'block';
+        };
+
+        window.loadDimensionExample = function() {
+            if (!currentReader) {
+                showError('Please load a JWW file first');
+                return;
+            }
+
+            const output = document.getElementById('dimension-output');
+            let text = '';
+
+            const dimensions = currentReader.getDimensions();
+            const dimTypes = ['LINEAR', 'ALIGNED', 'RADIAL', 'DIAMETRIC', 'ANGULAR', 'ANGULAR3P', 'ORDINATE'];
+            
+            text += `Found ${dimensions.size()} dimension entities\n\n`;
+
+            const typeCounts = {};
+            for (let i = 0; i < dimensions.size(); i++) {
+                const dim = dimensions.get(i);
+                const typeName = dimTypes[dim.type] || 'UNKNOWN';
+                typeCounts[typeName] = (typeCounts[typeName] || 0) + 1;
+            }
+
+            text += 'Dimension types:\n';
+            for (const [type, count] of Object.entries(typeCounts)) {
+                text += `  ${type}: ${count}\n`;
+            }
+            text += '\n';
+
+            for (let i = 0; i < dimensions.size() && i < 5; i++) {
+                const dim = dimensions.get(i);
+                const typeName = dimTypes[dim.type] || 'UNKNOWN';
+                
+                text += `Dimension ${i} (${typeName}):\n`;
+                text += `  Text: ${dim.text}\n`;
+                text += `  Definition point: (${dim.dpx.toFixed(2)}, ${dim.dpy.toFixed(2)})\n`;
+                text += `  Text position: (${dim.mpx.toFixed(2)}, ${dim.mpy.toFixed(2)})\n\n`;
+            }
+
+            if (dimensions.size() > 5) text += `... and ${dimensions.size() - 5} more dimensions\n`;
+
+            output.textContent = text;
+            output.style.display = 'block';
+        };
+
+        window.loadLeaderImageExample = function() {
+            if (!currentReader) {
+                showError('Please load a JWW file first');
+                return;
+            }
+
+            const output = document.getElementById('leader-output');
+            let text = '';
+
+            const leaders = currentReader.getLeaders();
+            text += `Found ${leaders.size()} leader entities\n`;
+
+            for (let i = 0; i < leaders.size() && i < 5; i++) {
+                const leader = leaders.get(i);
+                text += `Leader ${i}:\n`;
+                text += `  Arrow head: ${leader.arrowHeadFlag}\n`;
+                text += `  Path type: ${leader.pathType === 0 ? 'Straight' : 'Spline'}\n`;
+                text += `  Vertices: ${leader.vertices.size()}\n`;
+                
+                for (let j = 0; j < leader.vertices.size() && j < 3; j++) {
+                    const vertex = leader.vertices.get(j);
+                    text += `    Vertex ${j}: (${vertex.x.toFixed(2)}, ${vertex.y.toFixed(2)})\n`;
+                }
+                text += '\n';
+            }
+
+            const images = currentReader.getImages();
+            const imageDefs = currentReader.getImageDefs();
+            text += `\nFound ${images.size()} images with ${imageDefs.size()} definitions\n`;
+
+            for (let i = 0; i < images.size() && i < 5; i++) {
+                const image = images.get(i);
+                text += `Image ${i}:\n`;
+                text += `  Position: (${image.ipx.toFixed(2)}, ${image.ipy.toFixed(2)})\n`;
+                text += `  Size: ${image.width.toFixed(2)} x ${image.height.toFixed(2)}\n`;
+                text += `  Brightness: ${image.brightness}, Contrast: ${image.contrast}\n\n`;
+            }
+
+            output.textContent = text;
+            output.style.display = 'block';
+        };
+
+        window.loadPerformanceExample = function() {
+            if (!currentReader) {
+                showError('Please load a JWW file first');
+                return;
+            }
+
+            const output = document.getElementById('performance-output');
+            const memUsage = currentReader.getMemoryUsage();
+            const stats = currentReader.getEntityStats();
+            
+            let text = `Memory usage: ${(memUsage / 1024 / 1024).toFixed(2)} MB\n\n`;
+            text += 'Entity statistics:\n';
+            
+            let totalEntities = 0;
+            for (const [type, count] of Object.entries(stats)) {
+                if (count > 0) {
+                    text += `  ${type}: ${count}\n`;
+                    totalEntities += count;
+                }
+            }
+            
+            text += `\nTotal entities: ${totalEntities}`;
+            
+            output.textContent = text;
+            output.style.display = 'block';
+        };
+
+        window.loadErrorExample = function() {
+            if (!currentReader) {
+                showError('Please load a JWW file first');
+                return;
+            }
+
+            const output = document.getElementById('error-output');
+            const errors = currentReader.getParsingErrors();
+            
+            if (errors.size() === 0) {
+                output.textContent = 'No parsing errors found!';
+            } else {
+                let text = `Found ${errors.size()} parsing errors:\n\n`;
+                
+                const errorTypes = [
+                    'NONE', 'INVALID_BLOCK_REFERENCE', 'INVALID_IMAGE_REFERENCE',
+                    'INVALID_HATCH_BOUNDARY', 'INVALID_LEADER_PATH', 
+                    'INVALID_DIMENSION_DATA', 'MEMORY_ALLOCATION_FAILED',
+                    'UNKNOWN_ENTITY_TYPE'
+                ];
+                
+                for (let i = 0; i < errors.size(); i++) {
+                    const error = errors.get(i);
+                    text += `Error ${i + 1}:\n`;
+                    text += `  Type: ${errorTypes[error.type]}\n`;
+                    text += `  Message: ${error.message}\n`;
+                    text += `  Entity: ${error.entityType}\n`;
+                    if (error.lineNumber > 0) {
+                        text += `  Line: ${error.lineNumber}\n`;
+                    }
+                    text += '\n';
+                }
+                
+                output.textContent = text;
+            }
+            
+            output.style.display = 'block';
+        };
+
+        // Utility functions
+        function updateProgressBar(percentage) {
+            const container = document.getElementById('progress-container');
+            const bar = document.getElementById('progress-bar');
+            container.style.display = 'block';
+            bar.style.width = percentage + '%';
+            
+            if (percentage >= 100) {
+                setTimeout(() => {
+                    container.style.display = 'none';
+                }, 1000);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.body.insertBefore(errorDiv, document.body.firstChild);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+
+        // Load JWW module script
+        const script = document.createElement('script');
+        script.src = '../dist/jwwlib.js';
+        script.onload = () => {
+            initModule().catch(console.error);
+        };
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWWLib New Entities Test</title>
+    <script src="wasm/jwwlib.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+        .entity-type {
+            font-weight: bold;
+            color: #333;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        pre {
+            background: #fff;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>JWWLib New Entities Test</h1>
+    
+    <div class="test-section">
+        <input type="file" id="fileInput" accept=".jww">
+        <button onclick="loadFile()">Load JWW File</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        let Module;
+        
+        // Initialize the WASM module
+        createJwwModule().then(module => {
+            Module = module;
+            console.log('WASM module loaded successfully');
+        });
+
+        function loadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a JWW file');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const arrayBuffer = e.target.result;
+                analyzeFile(new Uint8Array(arrayBuffer));
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function analyzeFile(data) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            try {
+                // Allocate memory for the file data
+                const dataPtr = Module._malloc(data.length);
+                Module.HEAPU8.set(data, dataPtr);
+
+                // Create JWWReader instance
+                const reader = new Module.JWWReader(dataPtr, data.length);
+
+                // Test new entity types
+                testBlocks(reader, resultsDiv);
+                testInserts(reader, resultsDiv);
+                testHatches(reader, resultsDiv);
+                testDimensions(reader, resultsDiv);
+                testLeaders(reader, resultsDiv);
+                testImages(reader, resultsDiv);
+                testParsingErrors(reader, resultsDiv);
+
+                // Cleanup
+                reader.delete();
+                Module._free(dataPtr);
+
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="error">Error: ${error.message}</div>`;
+                console.error(error);
+            }
+        }
+
+        function testBlocks(reader, resultsDiv) {
+            const blocks = reader.getBlocks();
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `
+                <div class="entity-type">Blocks (${blocks.size()})</div>
+                <pre>${JSON.stringify(blocks, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(section);
+        }
+
+        function testInserts(reader, resultsDiv) {
+            const inserts = reader.getInserts();
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `
+                <div class="entity-type">Inserts/Block References (${inserts.size()})</div>
+                <pre>${JSON.stringify(inserts, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(section);
+        }
+
+        function testHatches(reader, resultsDiv) {
+            const hatches = reader.getHatches();
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `
+                <div class="entity-type">Hatches (${hatches.size()})</div>
+                <pre>${JSON.stringify(hatches, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(section);
+        }
+
+        function testDimensions(reader, resultsDiv) {
+            const dimensions = reader.getDimensions();
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            
+            // Count dimension types
+            const dimTypes = {};
+            for (let i = 0; i < dimensions.size(); i++) {
+                const dim = dimensions.get(i);
+                const typeName = getDimensionTypeName(dim.type);
+                dimTypes[typeName] = (dimTypes[typeName] || 0) + 1;
+            }
+            
+            section.innerHTML = `
+                <div class="entity-type">Dimensions (${dimensions.size()})</div>
+                <div>Types: ${JSON.stringify(dimTypes)}</div>
+                <pre>${JSON.stringify(dimensions, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(section);
+        }
+
+        function testLeaders(reader, resultsDiv) {
+            const leaders = reader.getLeaders();
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `
+                <div class="entity-type">Leaders (${leaders.size()})</div>
+                <pre>${JSON.stringify(leaders, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(section);
+        }
+
+        function testImages(reader, resultsDiv) {
+            const images = reader.getImages();
+            const imageDefs = reader.getImageDefs();
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `
+                <div class="entity-type">Images (${images.size()})</div>
+                <div>Image Definitions: ${imageDefs.size()}</div>
+                <pre>Images: ${JSON.stringify(images, null, 2)}</pre>
+                <pre>Image Defs: ${JSON.stringify(imageDefs, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(section);
+        }
+
+        function testParsingErrors(reader, resultsDiv) {
+            const errors = reader.getParsingErrors();
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            
+            if (errors.size() > 0) {
+                section.innerHTML = `
+                    <div class="entity-type error">Parsing Errors (${errors.size()})</div>
+                    <pre>${JSON.stringify(errors, null, 2)}</pre>
+                `;
+            } else {
+                section.innerHTML = `
+                    <div class="entity-type success">No Parsing Errors</div>
+                `;
+            }
+            resultsDiv.appendChild(section);
+        }
+
+        function getDimensionTypeName(type) {
+            const types = {
+                0: 'LINEAR',
+                1: 'ALIGNED',
+                2: 'RADIAL',
+                3: 'DIAMETRIC',
+                4: 'ANGULAR',
+                5: 'ANGULAR3P',
+                6: 'ORDINATE'
+            };
+            return types[type] || 'UNKNOWN';
+        }
+    </script>
+</body>
+</html>
