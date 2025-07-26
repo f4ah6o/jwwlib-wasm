@@ -2,6 +2,28 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   root: '.',
+  build: {
+    lib: {
+      entry: 'src/js/jwwlib.js',
+      name: 'JWWLibWASM',
+      fileName: 'jwwlib',
+      formats: ['es', 'cjs']
+    },
+    outDir: 'dist',
+    emptyOutDir: false,
+    rollupOptions: {
+      external: ['fs', 'path', 'url'],
+      output: {
+        exports: 'named',
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name === 'jwwlib.wasm') {
+            return 'jwwlib.wasm'
+          }
+          return assetInfo.name
+        }
+      }
+    }
+  },
   server: {
     port: 3000,
     headers: {

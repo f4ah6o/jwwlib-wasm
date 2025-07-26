@@ -32,7 +32,7 @@ emcmake cmake .. \
 
 # Build
 echo -e "${YELLOW}Building WebAssembly module...${NC}"
-emmake make -j$(nproc)
+emmake make -j$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 1)
 
 # Optimize WASM output
 echo -e "${YELLOW}Optimizing WebAssembly module...${NC}"

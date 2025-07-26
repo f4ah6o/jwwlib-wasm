@@ -8,7 +8,7 @@ export async function init() {
     }
     
     // Load the Emscripten module
-    const createJWWModule = (await import('../wasm/jwwlib.js')).default;
+    const createJWWModule = (await import('../../wasm/jwwlib.js')).default;
     moduleInstance = await createJWWModule();
     
     return moduleInstance;

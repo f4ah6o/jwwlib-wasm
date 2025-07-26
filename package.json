@@ -3,22 +3,22 @@
   "version": "0.1.0",
   "description": "WebAssembly library for reading JWW (JW_CAD) files in the browser",
   "type": "module",
-  "main": "dist/jwwlib.js",
-  "module": "dist/jwwlib.esm.js",
-  "types": "dist/jwwlib.d.ts",
+  "main": "wasm/jwwlib.js",
+  "module": "src/js/jwwlib.js",
+  "types": "index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/jwwlib.d.ts",
-      "import": "./dist/jwwlib.esm.js",
-      "require": "./dist/jwwlib.js",
-      "default": "./dist/jwwlib.js"
+      "types": "./index.d.ts",
+      "import": "./src/js/jwwlib.js",
+      "require": "./wasm/jwwlib.js",
+      "default": "./wasm/jwwlib.js"
     },
     "./wasm": {
       "default": "./wasm/jwwlib.wasm"
     }
   },
   "files": [
-    "dist",
+    "src/js",
     "wasm",
     "index.d.ts",
     "README.md",
@@ -26,12 +26,11 @@
     "NOTICE"
   ],
   "scripts": {
-    "build": "pnpm run build:wasm && pnpm run build:js && pnpm run build:types",
+    "build": "pnpm run build:wasm",
     "build:wasm": "pnpm run build:wasm:debug && pnpm run build:wasm:release",
     "build:wasm:debug": "./build_debug.sh",
     "build:wasm:release": "./build_release.sh",
     "build:js": "vite build",
-    "build:types": "tsc --emitDeclarationOnly --declaration --outDir dist src/js/jwwlib.js",
     "dev": "vite serve",
     "serve": "python3 test-server.py",
     "test": "vitest",
