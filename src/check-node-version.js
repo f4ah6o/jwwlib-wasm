@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { readFileSync } from "fs";
-import { dirname, join } from "path";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import semver from "semver";
-import { fileURLToPath } from "url";
+import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

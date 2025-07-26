@@ -1,11 +1,8 @@
 node_modules
 dist
-build
-build-debug
-build-release
+build*
 coverage
-wasm/*.js
-wasm/*.wasm
+wasm
 *.min.js
 *.map
 tests/e2e/playwright-report
