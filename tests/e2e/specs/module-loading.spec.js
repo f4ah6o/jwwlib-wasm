@@ -41,4 +41,59 @@ test.describe('WASM Module Loading', () => {
     
     expect(result.hasReader).toBe(true);
   });
+
+  test('should create JWWDocumentWASM instance', async ({ page }) => {
+    await page.goto('/examples/test.html');
+    
+    // Wait for module to load
+    await page.waitForSelector('#status:has-text("Module loaded successfully!")');
+    
+    // Test creating a document instance with new interface
+    const result = await page.evaluate(async () => {
+      if (typeof createJWWModule === 'undefined') {
+        return { error: 'createJWWModule not found' };
+      }
+      
+      const JWWModule = await createJWWModule();
+      
+      // Check if JWWDocumentWASM exists
+      if (!JWWModule.JWWDocumentWASM) {
+        return { error: 'JWWDocumentWASM not found in module' };
+      }
+      
+      const document = new JWWModule.JWWDocumentWASM();
+      const hasDocument = document !== null && document !== undefined;
+      
+      // Test methods exist
+      const methods = {
+        hasLoadFromMemory: typeof document.loadFromMemory === 'function',
+        hasGetEntities: typeof document.getEntities === 'function',
+        hasGetLayers: typeof document.getLayers === 'function',
+        hasGetEntityCount: typeof document.getEntityCount === 'function',
+        hasGetLayerCount: typeof document.getLayerCount === 'function',
+        hasHasError: typeof document.hasError === 'function',
+        hasGetLastError: typeof document.getLastError === 'function',
+        hasDispose: typeof document.dispose === 'function',
+        hasGetMemoryUsage: typeof document.getMemoryUsage === 'function'
+      };
+      
+      // Clean up
+      if (document && document.dispose) {
+        document.dispose();
+      }
+      
+      return { hasDocument, methods };
+    });
+    
+    expect(result.hasDocument).toBe(true);
+    expect(result.methods.hasLoadFromMemory).toBe(true);
+    expect(result.methods.hasGetEntities).toBe(true);
+    expect(result.methods.hasGetLayers).toBe(true);
+    expect(result.methods.hasGetEntityCount).toBe(true);
+    expect(result.methods.hasGetLayerCount).toBe(true);
+    expect(result.methods.hasHasError).toBe(true);
+    expect(result.methods.hasGetLastError).toBe(true);
+    expect(result.methods.hasDispose).toBe(true);
+    expect(result.methods.hasGetMemoryUsage).toBe(true);
+  });
 });
