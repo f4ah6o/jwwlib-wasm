@@ -3,17 +3,7 @@
  * This file demonstrates TypeScript usage with the new entity types
  */
 
-import type {
-	BlockData,
-	DimensionData,
-	HatchData,
-	ImageData,
-	InsertData,
-	JWWModule,
-	JWWReader,
-	LeaderData,
-	ParseError,
-} from "../src/types/jww";
+import type { BlockData, JWWModule, JWWReader } from "../src/types/jww";
 
 // Initialize the module
 async function initializeJWWModule(): Promise<JWWModule> {
@@ -269,7 +259,13 @@ async function processImages(reader: JWWReader): Promise<void> {
 	);
 
 	// Build image definition index
-	const imageDefIndex = new Map<string, any>();
+	interface ImageDef {
+		fileName: string;
+		sizeX: number;
+		sizeY: number;
+		imageData?: string;
+	}
+	const imageDefIndex = new Map<string, ImageDef>();
 	for (let i = 0; i < imageDefs.size(); i++) {
 		const def = imageDefs.get(i);
 		imageDefIndex.set(def.fileName, def);
@@ -420,7 +416,7 @@ async function processLargeFile(file: File): Promise<void> {
 
 			// Process batch
 			for (let j = i; j < end; j++) {
-				const entity = entities.get(j);
+				const _entity = entities.get(j);
 				// Process entity...
 			}
 
