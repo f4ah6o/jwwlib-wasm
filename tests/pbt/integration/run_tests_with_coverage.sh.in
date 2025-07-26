@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Script to run tests with coverage collection
+
+BUILD_DIR="@CMAKE_BINARY_DIR@"
+SOURCE_DIR="@CMAKE_SOURCE_DIR@"
+
+# Clean previous coverage data
+find "${BUILD_DIR}" -name "*.gcda" -delete
+
+# Run all tests
+echo "Running all tests with coverage..."
+"${BUILD_DIR}/tests/pbt/integration/jwwlib_all_tests" \
+    --gtest_output=xml:all_tests_results.xml
+
+# Run PBT-specific tests with different configurations
+echo "Running PBT tests with various configurations..."
+"${BUILD_DIR}/tests/pbt/integration/jwwlib_pbt_tests" \
+    --pbt-max-success=100 \
+    --gtest_output=xml:pbt_full_results.xml
+
+"${BUILD_DIR}/tests/pbt/integration/jwwlib_pbt_tests" \
+    --pbt-max-success=10 \
+    --pbt-max-size=20 \
+    --gtest_output=xml:pbt_quick_results.xml
+
+# Generate coverage report
+echo "Generating coverage report..."
+cd "${BUILD_DIR}"
+
+# Collect coverage data
+lcov --capture \
+     --directory . \
+     --output-file coverage.info \
+     --no-external \
+     --base-directory "${SOURCE_DIR}"
+
+# Filter out test files and system headers
+lcov --remove coverage.info \
+     '*/tests/*' \
+     '*/third_party/*' \
+     '/usr/*' \
+     --output-file coverage_filtered.info
+
+# Generate HTML report
+genhtml coverage_filtered.info \
+        --output-directory coverage_report \
+        --title "JWWLib WASM Coverage Report" \
+        --show-details \
+        --legend
+
+# Generate Cobertura XML for CI
+if command -v lcov_cobertura &> /dev/null; then
+    lcov_cobertura coverage_filtered.info \
+                   --output coverage.xml \
+                   --base-dir "${SOURCE_DIR}"
+fi
+
+# Print summary
+echo "Coverage summary:"
+lcov --summary coverage_filtered.info
+
+# Check coverage threshold
+COVERAGE_THRESHOLD=80
+COVERAGE_PERCENT=$(lcov --summary coverage_filtered.info 2>&1 | grep "lines" | awk '{print $2}' | sed 's/%//')
+
+if (( $(echo "$COVERAGE_PERCENT < $COVERAGE_THRESHOLD" | bc -l) )); then
+    echo "ERROR: Coverage ${COVERAGE_PERCENT}% is below threshold ${COVERAGE_THRESHOLD}%"
+    exit 1
+else
+    echo "SUCCESS: Coverage ${COVERAGE_PERCENT}% meets threshold ${COVERAGE_THRESHOLD}%"
+fi
