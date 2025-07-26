@@ -1,0 +1,198 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.8.1
+
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.61
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Build project
+      run: pnpm run build
+
+    - name: Run tests
+      run: pnpm test
+
+    - name: Create tarball
+      run: |
+        npm pack
+        mkdir -p release-artifacts
+        mv *.tgz release-artifacts/
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: npm-package
+        path: release-artifacts/
+        retention-days: 1
+
+  publish-npm:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.8.1
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: npm-package
+        path: release-artifacts
+
+    - name: Configure npm
+      run: |
+        echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+        npm whoami
+
+    - name: Publish to npm with provenance
+      run: |
+        cd release-artifacts
+        npm publish *.tgz --provenance --access public
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  create-github-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: npm-package
+        path: release-artifacts
+
+    - name: Extract version from tag
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        # Get the previous tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        if [ -z "$PREV_TAG" ]; then
+          echo "RELEASE_NOTES=Initial release" >> $GITHUB_OUTPUT
+        else
+          # Generate changelog between tags
+          CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" | grep -v "Merge pull request")
+          
+          # Create release notes
+          cat << EOF > release_notes.md
+        ## What's Changed
+        
+        $CHANGELOG
+        
+        ## Installation
+        
+        \`\`\`bash
+        npm install jwwlib-wasm@${{ steps.version.outputs.VERSION }}
+        \`\`\`
+        
+        ## Full Changelog
+        
+        https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ github.ref_name }}
+        EOF
+          
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: v${{ steps.version.outputs.VERSION }}
+        body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
+        files: release-artifacts/*.tgz
+        draft: false
+        prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+        generate_release_notes: true
+
+  publish-docs:
+    name: Publish Documentation
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.8.1
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Build documentation
+      run: |
+        # Add documentation build command when available
+        echo "Documentation build would go here"
+
+    - name: Deploy to GitHub Pages
+      if: false # Enable when docs are ready
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs-build
+        cname: jwwlib-wasm.example.com

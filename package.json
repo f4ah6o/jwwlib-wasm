@@ -6,25 +6,45 @@
   "main": "dist/jwwlib.js",
   "module": "dist/jwwlib.esm.js",
   "types": "dist/jwwlib.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/jwwlib.d.ts",
+      "import": "./dist/jwwlib.esm.js",
+      "require": "./dist/jwwlib.js",
+      "default": "./dist/jwwlib.js"
+    },
+    "./wasm": {
+      "default": "./wasm/jwwlib.wasm"
+    }
+  },
   "files": [
     "dist",
-    "wasm"
+    "wasm",
+    "index.d.ts",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
-    "build": "pnpm run build:wasm && pnpm run build:js",
+    "build": "pnpm run build:wasm && pnpm run build:js && pnpm run build:types",
     "build:wasm": "pnpm run build:wasm:debug && pnpm run build:wasm:release",
-    "build:wasm:debug": "mkdir -p build && cd build && emcmake cmake -DCMAKE_BUILD_TYPE=Debug .. && emmake make",
-    "build:wasm:release": "mkdir -p build-release && cd build-release && emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make",
+    "build:wasm:debug": "./build_debug.sh",
+    "build:wasm:release": "./build_release.sh",
     "build:js": "vite build",
+    "build:types": "tsc --emitDeclarationOnly --declaration --outDir dist src/js/jwwlib.js",
     "dev": "vite serve",
     "serve": "python3 test-server.py",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "cd tests/e2e && pnpm install && pnpm test",
     "test:e2e:headed": "cd tests/e2e && pnpm install && pnpm test:headed",
+    "test:coverage": "vitest --coverage",
     "lint": "biome check --apply .",
     "format": "biome format --write .",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "pnpm run build",
+    "version": "pnpm run build && git add -A dist",
+    "postversion": "git push && git push --tags",
+    "postinstall": "node src/check-node-version.js || true"
   },
   "keywords": [
     "jww",
@@ -45,15 +65,30 @@
     "url": "https://github.com/f4ah6o/jwwlib-wasm/issues"
   },
   "homepage": "https://github.com/f4ah6o/jwwlib-wasm",
+  "dependencies": {
+    "semver": "^7.7.2"
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.1.2",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.3",
+    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/release-notes-generator": "^14.0.3",
     "@types/node": "^24.1.0",
+    "conventional-changelog-conventionalcommits": "^9.1.0",
+    "semantic-release": "^24.2.7",
     "typescript": "^5.8.3",
     "vite": "^7.0.6",
     "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=14.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "packageManager": "pnpm@10.8.1"
 }

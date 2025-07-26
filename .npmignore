@@ -1,0 +1,61 @@
+# Source files
+src/
+include/
+CMakeLists.txt
+
+# Build directories
+build/
+build-debug/
+build-release/
+cmake-build-*/
+
+# Test files
+tests/
+test/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+test-server.py
+
+# Development files
+.github/
+.vscode/
+.idea/
+*.log
+*.tmp
+.DS_Store
+
+# Configuration files
+vite.config.js
+vitest.config.ts
+tsconfig.json
+.gitignore
+.npmignore
+.eslintrc
+.prettierrc
+biome.json
+
+# Scripts
+scripts/
+build_debug.sh
+build_release.sh
+
+# Documentation source
+docs/
+
+# Lock files (keep only package-lock.json for npm)
+pnpm-lock.yaml
+yarn.lock
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Examples (optional - you might want to keep these)
+# examples/
+
+# Temporary files
+*.swp
+*.swo
+*~

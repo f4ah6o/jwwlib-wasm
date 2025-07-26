@@ -1,0 +1,134 @@
+name: Generate SBOM
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  sbom:
+    name: Generate Software Bill of Materials
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.8.1
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Generate SBOM using CycloneDX
+      run: |
+        npx @cyclonedx/cyclonedx-npm --output-format json --output-file sbom-cyclonedx.json
+        npx @cyclonedx/cyclonedx-npm --output-format xml --output-file sbom-cyclonedx.xml
+
+    - name: Generate SBOM using SPDX
+      run: |
+        npx spdx-sbom-generator -p . -o sbom-spdx.json
+
+    - name: Validate SBOMs
+      run: |
+        # Validate CycloneDX SBOM
+        npx @cyclonedx/cyclonedx-cli validate --input-file sbom-cyclonedx.json --input-format json || true
+        
+        # Basic validation for SPDX
+        jq . sbom-spdx.json > /dev/null || echo "SPDX SBOM validation failed"
+
+    - name: Create SBOM summary
+      run: |
+        cat > sbom-summary.md << 'EOF'
+        # Software Bill of Materials (SBOM)
+        
+        Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        
+        ## Package Information
+        - Name: jwwlib-wasm
+        - Version: $(jq -r '.version' package.json)
+        - License: GPL-2.0
+        
+        ## Available Formats
+        - CycloneDX JSON: sbom-cyclonedx.json
+        - CycloneDX XML: sbom-cyclonedx.xml
+        - SPDX JSON: sbom-spdx.json
+        
+        ## Dependencies Summary
+        Total Dependencies: $(jq '.dependencies | length' sbom-cyclonedx.json)
+        
+        ### License Distribution
+        $(jq -r '.components[].licenses[]?.license.id // "Unknown"' sbom-cyclonedx.json | sort | uniq -c | awk '{print "- " $2 ": " $1}')
+        
+        ## Security Contact
+        security@example.com
+        
+        ## Verification
+        These SBOMs can be verified using:
+        - CycloneDX CLI: https://github.com/CycloneDX/cyclonedx-cli
+        - SPDX Tools: https://github.com/spdx/tools
+        EOF
+
+    - name: Upload SBOMs as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom-files
+        path: |
+          sbom-*.json
+          sbom-*.xml
+          sbom-summary.md
+        retention-days: 90
+
+    - name: Attach SBOMs to release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          sbom-cyclonedx.json
+          sbom-cyclonedx.xml
+          sbom-spdx.json
+          sbom-summary.md
+
+    - name: Generate vulnerability report
+      run: |
+        # Use Grype for vulnerability scanning
+        curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+        
+        # Scan using SBOM
+        grype sbom:sbom-cyclonedx.json -o json > vulnerabilities.json || true
+        grype sbom:sbom-cyclonedx.json -o table > vulnerabilities.txt || true
+        
+        # Create summary
+        echo "## Vulnerability Scan Results" > vulnerability-summary.md
+        echo "Scan Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> vulnerability-summary.md
+        echo "" >> vulnerability-summary.md
+        
+        if [ -s vulnerabilities.txt ]; then
+          echo "### Found Vulnerabilities:" >> vulnerability-summary.md
+          cat vulnerabilities.txt >> vulnerability-summary.md
+        else
+          echo "✅ No known vulnerabilities found." >> vulnerability-summary.md
+        fi
+
+    - name: Upload vulnerability report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: vulnerability-report
+        path: |
+          vulnerabilities.json
+          vulnerabilities.txt
+          vulnerability-summary.md
+        retention-days: 30

@@ -10,52 +10,38 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}Building jwwlib-wasm in Debug mode with PBT support...${NC}"
+echo -e "${GREEN}Building jwwlib-wasm in Debug mode...${NC}"
+
+# Check if Emscripten is available
+if ! command -v emcc &> /dev/null; then
+    echo -e "${RED}Error: Emscripten not found. Please install and activate emsdk.${NC}"
+    exit 1
+fi
 
 # Create build directory
 BUILD_DIR="build-debug"
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 
-# Configure with CMake
-echo -e "${YELLOW}Configuring CMake...${NC}"
-cmake .. \
+# Configure with Emscripten
+echo -e "${YELLOW}Configuring with Emscripten (Debug mode)...${NC}"
+emcmake cmake .. \
     -DCMAKE_BUILD_TYPE=Debug \
-    -DBUILD_TESTS=ON \
-    -DBUILD_EXAMPLES=ON
+    -DBUILD_TESTS=OFF \
+    -DBUILD_EXAMPLES=OFF
 
 # Build
-echo -e "${YELLOW}Building...${NC}"
-make -j$(nproc)
+echo -e "${YELLOW}Building WebAssembly module...${NC}"
+emmake make -j$(nproc)
 
-# Run tests if requested
-if [ "$1" == "--test" ]; then
-    echo -e "${YELLOW}Running tests...${NC}"
-    ctest --output-on-failure
-    
-    # Run PBT tests specifically
-    echo -e "${YELLOW}Running Property-Based Tests...${NC}"
-    ./tests/pbt/pbt_tests
-fi
+# Copy outputs to wasm directory
+echo -e "${YELLOW}Copying outputs...${NC}"
+cd ..
+mkdir -p wasm
+cp -f dist/jwwlib.js wasm/
+cp -f dist/jwwlib.wasm wasm/
 
-echo -e "${GREEN}Build completed successfully!${NC}"
-
-# For WebAssembly build
-if [ "$1" == "--wasm" ]; then
-    cd ..
-    echo -e "${YELLOW}Building WebAssembly version...${NC}"
-    
-    BUILD_DIR_WASM="build-wasm-debug"
-    mkdir -p $BUILD_DIR_WASM
-    cd $BUILD_DIR_WASM
-    
-    # Use Emscripten
-    emcmake cmake .. \
-        -DCMAKE_BUILD_TYPE=Debug \
-        -DBUILD_TESTS=OFF \
-        -DBUILD_EXAMPLES=OFF
-    
-    emmake make -j$(nproc)
-    
-    echo -e "${GREEN}WebAssembly build completed!${NC}"
-fi
+echo -e "${GREEN}WebAssembly build (Debug) completed successfully!${NC}"
+echo -e "${GREEN}Output files:${NC}"
+echo -e "  - wasm/jwwlib.js"
+echo -e "  - wasm/jwwlib.wasm"

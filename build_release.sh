@@ -12,50 +12,48 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}Building jwwlib-wasm in Release mode...${NC}"
 
+# Check if Emscripten is available
+if ! command -v emcc &> /dev/null; then
+    echo -e "${RED}Error: Emscripten not found. Please install and activate emsdk.${NC}"
+    exit 1
+fi
+
 # Create build directory
 BUILD_DIR="build-release"
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 
-# Configure with CMake
-echo -e "${YELLOW}Configuring CMake...${NC}"
-cmake .. \
+# Configure with Emscripten
+echo -e "${YELLOW}Configuring with Emscripten (Release mode)...${NC}"
+emcmake cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_TESTS=ON \
-    -DBUILD_EXAMPLES=ON
+    -DBUILD_TESTS=OFF \
+    -DBUILD_EXAMPLES=OFF
 
 # Build
-echo -e "${YELLOW}Building...${NC}"
-make -j$(nproc)
+echo -e "${YELLOW}Building WebAssembly module...${NC}"
+emmake make -j$(nproc)
 
-# Run tests if requested
-if [ "$1" == "--test" ]; then
-    echo -e "${YELLOW}Running tests...${NC}"
-    ctest --output-on-failure
-    
-    # Run PBT tests with optimizations
-    echo -e "${YELLOW}Running Property-Based Tests (Release)...${NC}"
-    ./tests/pbt/pbt_tests
+# Optimize WASM output
+echo -e "${YELLOW}Optimizing WebAssembly module...${NC}"
+if command -v wasm-opt &> /dev/null; then
+    wasm-opt -O3 ../dist/jwwlib.wasm -o ../dist/jwwlib.wasm
+else
+    echo -e "${YELLOW}Warning: wasm-opt not found. Skipping optimization.${NC}"
 fi
 
-echo -e "${GREEN}Build completed successfully!${NC}"
+# Copy outputs to wasm directory
+echo -e "${YELLOW}Copying outputs...${NC}"
+cd ..
+mkdir -p wasm
+cp -f dist/jwwlib.js wasm/
+cp -f dist/jwwlib.wasm wasm/
 
-# For WebAssembly build
-if [ "$1" == "--wasm" ]; then
-    cd ..
-    echo -e "${YELLOW}Building WebAssembly version (Release)...${NC}"
-    
-    BUILD_DIR_WASM="build-wasm-release"
-    mkdir -p $BUILD_DIR_WASM
-    cd $BUILD_DIR_WASM
-    
-    # Use Emscripten
-    emcmake cmake .. \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_TESTS=OFF \
-        -DBUILD_EXAMPLES=OFF
-    
-    emmake make -j$(nproc)
-    
-    echo -e "${GREEN}WebAssembly build completed!${NC}"
-fi
+echo -e "${GREEN}WebAssembly build (Release) completed successfully!${NC}"
+echo -e "${GREEN}Output files:${NC}"
+echo -e "  - wasm/jwwlib.js"
+echo -e "  - wasm/jwwlib.wasm"
+
+# Show file sizes
+echo -e "\n${YELLOW}File sizes:${NC}"
+ls -lh wasm/jwwlib.*

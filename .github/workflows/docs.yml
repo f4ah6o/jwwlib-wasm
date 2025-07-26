@@ -1,0 +1,185 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'package.json'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.8.1
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Install TypeDoc
+      run: pnpm add -D typedoc typedoc-plugin-markdown
+
+    - name: Build API documentation
+      run: |
+        mkdir -p docs-build/api
+        npx typedoc \
+          --out docs-build/api \
+          --name "jwwlib-wasm API" \
+          --readme README.md \
+          --plugin typedoc-plugin-markdown \
+          --excludePrivate \
+          --excludeProtected \
+          --excludeInternal \
+          --disableSources \
+          --hideGenerator \
+          src/js/jwwlib.js
+
+    - name: Copy static documentation
+      run: |
+        cp README.md docs-build/
+        cp LICENSE docs-build/
+        cp -r examples docs-build/
+        
+        # Create index.html
+        cat > docs-build/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>jwwlib-wasm Documentation</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 900px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }
+                h1, h2 { color: #2c3e50; }
+                a { color: #3498db; text-decoration: none; }
+                a:hover { text-decoration: underline; }
+                code {
+                    background: #f4f4f4;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    font-family: Consolas, Monaco, monospace;
+                }
+                .nav {
+                    background: #f8f9fa;
+                    padding: 15px;
+                    border-radius: 5px;
+                    margin-bottom: 30px;
+                }
+                .nav ul {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                }
+                .nav li {
+                    display: inline;
+                    margin-right: 20px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="nav">
+                <ul>
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#installation">Installation</a></li>
+                    <li><a href="#quick-start">Quick Start</a></li>
+                    <li><a href="api/">API Docs</a></li>
+                    <li><a href="examples/">Examples</a></li>
+                    <li><a href="https://github.com/f4ah6o/jwwlib-wasm">GitHub</a></li>
+                </ul>
+            </div>
+            
+            <h1>jwwlib-wasm</h1>
+            <p>A WebAssembly library for reading JWW (JW_CAD) files in the browser.</p>
+            
+            <h2 id="overview">Overview</h2>
+            <p>jwwlib-wasm is a WebAssembly port of the JWW file reading functionality from LibreCAD's jwwlib. 
+            It allows you to parse and extract geometric data from JWW files directly in web browsers.</p>
+            
+            <h2 id="installation">Installation</h2>
+            <pre><code>npm install jwwlib-wasm</code></pre>
+            
+            <h2 id="quick-start">Quick Start</h2>
+            <pre><code>import { JWWReader } from 'jwwlib-wasm';
+
+// Initialize the WASM module
+await JWWReader.init();
+
+// Read a JWW file
+const fileBuffer = await fetch('example.jww').then(r => r.arrayBuffer());
+const reader = new JWWReader(fileBuffer);
+
+// Get entities
+const entities = reader.getEntities();
+console.log(entities);</code></pre>
+            
+            <h2>Documentation</h2>
+            <ul>
+                <li><a href="api/">API Reference</a></li>
+                <li><a href="examples/">Examples</a></li>
+                <li><a href="https://github.com/f4ah6o/jwwlib-wasm#readme">Full README</a></li>
+            </ul>
+        </body>
+        </html>
+        EOF
+
+    - name: Validate examples
+      run: |
+        # Test that example files are valid
+        for example in docs-build/examples/*.html; do
+          if [ -f "$example" ]; then
+            echo "Validating $example"
+            # Basic HTML validation
+            grep -q "<!DOCTYPE html>" "$example" || echo "Warning: Missing DOCTYPE in $example"
+          fi
+        done
+
+    - name: Upload documentation artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: docs-build
+
+  deploy-docs:
+    name: Deploy Documentation
+    needs: build-docs
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
