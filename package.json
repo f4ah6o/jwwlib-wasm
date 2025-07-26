@@ -46,14 +46,14 @@
   },
   "homepage": "https://github.com/f4ah6o/jwwlib-wasm",
   "devDependencies": {
-    "@biomejs/biome": "^1.8.0",
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "vite": "^5.0.0",
-    "vitest": "^1.0.0"
+    "@biomejs/biome": "^2.1.2",
+    "@types/node": "^24.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.6",
+    "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=14.0.0"
   },
-  "packageManager": "pnpm@8.15.0"
+  "packageManager": "pnpm@10.8.1"
 }
