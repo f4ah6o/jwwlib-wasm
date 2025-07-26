@@ -8,7 +8,8 @@ export async function init() {
     }
     
     // Load the Emscripten module
-    const createJWWModule = (await import('../../wasm/jwwlib.js')).default;
+    const module = await import('../../wasm/jwwlib.js');
+    const createJWWModule = module.default || module;
     moduleInstance = await createJWWModule();
     
     return moduleInstance;
@@ -68,4 +69,4 @@ export class JWWReader {
 }
 
 // Re-export the module creation function for compatibility
-export { default as createJWWModule } from '../wasm/jwwlib.js';
+// Re-export handled differently due to CommonJS/ESM compatibility
