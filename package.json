@@ -38,7 +38,7 @@
     "test:e2e": "cd tests/e2e && pnpm install && pnpm test",
     "test:e2e:headed": "cd tests/e2e && pnpm install && pnpm test:headed",
     "test:coverage": "vitest --coverage",
-    "lint": "biome check --apply .",
+    "lint": "biome check --write .",
     "format": "biome format --write .",
     "prepublishOnly": "pnpm run build",
     "version": "pnpm run build && git add -A dist",
