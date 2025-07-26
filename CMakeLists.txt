@@ -53,6 +53,18 @@ if(NOT EMSCRIPTEN)
             FetchContent_MakeAvailable(googletest)
         endif()
         
+        # Fetch RapidCheck for Property-Based Testing
+        include(FetchContent)
+        FetchContent_Declare(
+            rapidcheck
+            GIT_REPOSITORY https://github.com/emil-e/rapidcheck.git
+            GIT_TAG master
+        )
+        FetchContent_MakeAvailable(rapidcheck)
+        
+        # Find zlib for compression support in PBT framework
+        find_package(ZLIB REQUIRED)
+        
         add_subdirectory(tests)
     endif()
     

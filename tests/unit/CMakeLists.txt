@@ -12,6 +12,7 @@ include_directories(
 add_executable(test_new_entities test_new_entities.cpp)
 add_executable(test_memory_leaks test_memory_leaks.cpp)
 add_executable(test_batch_processing test_batch_processing.cpp)
+add_executable(test_wasm_interface test_wasm_interface.cpp)
 
 # Link with Google Test and jwwlib
 target_link_libraries(test_new_entities 
@@ -32,10 +33,17 @@ target_link_libraries(test_batch_processing
     jwwlib_static
 )
 
+target_link_libraries(test_wasm_interface 
+    GTest::gtest 
+    GTest::gtest_main
+    jwwlib_static
+)
+
 # Add tests to CTest
 add_test(NAME NewEntitiesTest COMMAND test_new_entities)
 add_test(NAME MemoryLeakTest COMMAND test_memory_leaks)
 add_test(NAME BatchProcessingTest COMMAND test_batch_processing)
+add_test(NAME WASMInterfaceTest COMMAND test_wasm_interface)
 
 # Enable memory leak detection for tests (if using AddressSanitizer)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
