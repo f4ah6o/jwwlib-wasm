@@ -1,93 +1,95 @@
 {
-  "name": "jwwlib-wasm",
-  "version": "0.1.0",
-  "description": "WebAssembly library for reading JWW (JW_CAD) files in the browser",
-  "type": "module",
-  "main": "wasm/jwwlib.js",
-  "module": "src/js/jwwlib.js",
-  "types": "index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./index.d.ts",
-      "import": "./src/js/jwwlib.js",
-      "require": "./wasm/jwwlib.js",
-      "default": "./wasm/jwwlib.js"
-    },
-    "./wasm": {
-      "default": "./wasm/jwwlib.wasm"
-    }
-  },
-  "files": [
-    "src/js",
-    "wasm",
-    "index.d.ts",
-    "README.md",
-    "LICENSE",
-    "NOTICE"
-  ],
-  "scripts": {
-    "build": "pnpm run build:wasm",
-    "build:wasm": "pnpm run build:wasm:debug && pnpm run build:wasm:release",
-    "build:wasm:debug": "./build_debug.sh",
-    "build:wasm:release": "./build_release.sh",
-    "build:js": "vite build",
-    "dev": "vite serve",
-    "serve": "python3 test-server.py",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:e2e": "cd tests/e2e && pnpm install && pnpm test",
-    "test:e2e:headed": "cd tests/e2e && pnpm install && pnpm test:headed",
-    "test:coverage": "vitest --coverage",
-    "lint": "biome check --apply .",
-    "format": "biome format --write .",
-    "prepublishOnly": "pnpm run build",
-    "version": "pnpm run build && git add -A dist",
-    "postversion": "git push && git push --tags",
-    "postinstall": "node src/check-node-version.js || true"
-  },
-  "keywords": [
-    "jww",
-    "jw-cad",
-    "cad",
-    "wasm",
-    "webassembly",
-    "drawing",
-    "engineering"
-  ],
-  "author": "jwwlib-wasm contributors",
-  "license": "GPL-2.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/f4ah6o/jwwlib-wasm.git"
-  },
-  "bugs": {
-    "url": "https://github.com/f4ah6o/jwwlib-wasm/issues"
-  },
-  "homepage": "https://github.com/f4ah6o/jwwlib-wasm",
-  "dependencies": {
-    "semver": "^7.7.2"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.1.2",
-    "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/commit-analyzer": "^13.0.1",
-    "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^11.0.3",
-    "@semantic-release/npm": "^12.0.2",
-    "@semantic-release/release-notes-generator": "^14.0.3",
-    "@types/node": "^24.1.0",
-    "conventional-changelog-conventionalcommits": "^9.1.0",
-    "semantic-release": "^24.2.7",
-    "typescript": "^5.8.3",
-    "vite": "^7.0.6",
-    "vitest": "^3.2.4"
-  },
-  "engines": {
-    "node": ">=14.0.0"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
-  "packageManager": "pnpm@10.8.1"
+	"name": "jwwlib-wasm",
+	"version": "0.1.0",
+	"description": "WebAssembly library for reading JWW (JW_CAD) files in the browser",
+	"type": "module",
+	"main": "wasm/jwwlib.js",
+	"module": "src/js/jwwlib.js",
+	"types": "index.d.ts",
+	"exports": {
+		".": {
+			"types": "./index.d.ts",
+			"import": "./src/js/jwwlib.js",
+			"require": "./wasm/jwwlib.js",
+			"default": "./wasm/jwwlib.js"
+		},
+		"./wasm": {
+			"default": "./wasm/jwwlib.wasm"
+		}
+	},
+	"files": [
+		"src/js",
+		"wasm",
+		"index.d.ts",
+		"README.md",
+		"LICENSE",
+		"NOTICE"
+	],
+	"scripts": {
+		"build": "pnpm run build:wasm",
+		"build:wasm": "pnpm run build:wasm:debug && pnpm run build:wasm:release",
+		"build:wasm:debug": "./build_debug.sh",
+		"build:wasm:release": "./build_release.sh",
+		"build:js": "vite build",
+		"dev": "vite serve",
+		"serve": "python3 test-server.py",
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"test:e2e": "cd tests/e2e && pnpm install && pnpm test",
+		"test:e2e:headed": "cd tests/e2e && pnpm install && pnpm test:headed",
+		"test:coverage": "vitest --coverage",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format .",
+		"format:fix": "biome format --write .",
+		"prepublishOnly": "pnpm run build",
+		"version": "pnpm run build && git add -A dist",
+		"postversion": "git push && git push --tags",
+		"postinstall": "node src/check-node-version.js || true"
+	},
+	"keywords": [
+		"jww",
+		"jw-cad",
+		"cad",
+		"wasm",
+		"webassembly",
+		"drawing",
+		"engineering"
+	],
+	"author": "jwwlib-wasm contributors",
+	"license": "GPL-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/f4ah6o/jwwlib-wasm.git"
+	},
+	"bugs": {
+		"url": "https://github.com/f4ah6o/jwwlib-wasm/issues"
+	},
+	"homepage": "https://github.com/f4ah6o/jwwlib-wasm",
+	"dependencies": {
+		"semver": "^7.7.2"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.1.2",
+		"@semantic-release/changelog": "^6.0.3",
+		"@semantic-release/commit-analyzer": "^13.0.1",
+		"@semantic-release/git": "^10.0.1",
+		"@semantic-release/github": "^11.0.3",
+		"@semantic-release/npm": "^12.0.2",
+		"@semantic-release/release-notes-generator": "^14.0.3",
+		"@types/node": "^24.1.0",
+		"conventional-changelog-conventionalcommits": "^9.1.0",
+		"semantic-release": "^24.2.7",
+		"typescript": "^5.8.3",
+		"vite": "^7.0.6",
+		"vitest": "^3.2.4"
+	},
+	"engines": {
+		"node": ">=14.0.0"
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org/"
+	},
+	"packageManager": "pnpm@10.8.1"
 }

@@ -1,347 +1,348 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 
 // Type definitions for the WASM module
 interface JWWModule {
-  ready: Promise<void>;
-  _malloc: (size: number) => number;
-  _free: (ptr: number) => void;
-  HEAPU8: Uint8Array;
-  JWWReader: new (dataPtr: number, size: number) => JWWReaderInstance;
+	ready: Promise<void>;
+	_malloc: (size: number) => number;
+	_free: (ptr: number) => void;
+	HEAPU8: Uint8Array;
+	JWWReader: new (dataPtr: number, size: number) => JWWReaderInstance;
 }
 
 interface JWWReaderInstance {
-  getLines: () => any[];
-  getCircles: () => any[];
-  getArcs: () => any[];
-  getTexts: () => any[];
-  getBlocks: () => any[];
-  getInserts: () => any[];
-  getHatches: () => any[];
-  getLeaders: () => any[];
-  getImages: () => any[];
-  getImageDefs: () => any[];
-  getDimensions: () => any[];
-  getSplines: () => any[];
-  getParsingErrors: () => any[];
-  getMemoryUsage: () => number;
-  getEntityStats: () => Map<string, number>;
-  delete: () => void;
+	getLines: () => any[];
+	getCircles: () => any[];
+	getArcs: () => any[];
+	getTexts: () => any[];
+	getBlocks: () => any[];
+	getInserts: () => any[];
+	getHatches: () => any[];
+	getLeaders: () => any[];
+	getImages: () => any[];
+	getImageDefs: () => any[];
+	getDimensions: () => any[];
+	getSplines: () => any[];
+	getParsingErrors: () => any[];
+	getMemoryUsage: () => number;
+	getEntityStats: () => Map<string, number>;
+	delete: () => void;
 }
 
-describe('New Entity Types Support', () => {
-  let Module: JWWModule;
-  let testFileData: Uint8Array;
+describe("New Entity Types Support", () => {
+	let Module: JWWModule;
+	let testFileData: Uint8Array;
 
-  beforeAll(async () => {
-    // Load WASM module
-    const wasmPath = join(__dirname, '../../wasm/jwwlib.js');
-    const createModule = require(wasmPath);
-    Module = await createModule();
-    await Module.ready;
+	beforeAll(async () => {
+		// Load WASM module
+		const wasmPath = join(__dirname, "../../wasm/jwwlib.js");
+		const { default: createModule } = await import(wasmPath);
+		Module = await createModule();
+		await Module.ready;
 
-    // Load test file
-    const testFilePath = join(__dirname, '../fixtures/test-entities.jww');
-    testFileData = new Uint8Array(readFileSync(testFilePath));
-  });
+		// Load test file
+		const testFilePath = join(__dirname, "../fixtures/test-entities.jww");
+		testFileData = new Uint8Array(readFileSync(testFilePath));
+	});
 
-  describe('Block and Insert Entities', () => {
-    it('should read block definitions', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+	describe("Block and Insert Entities", () => {
+		it("should read block definitions", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const blocks = reader.getBlocks();
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const blocks = reader.getBlocks();
 
-      expect(blocks.size()).toBeGreaterThan(0);
-      
-      // Check block structure
-      const firstBlock = blocks.get(0);
-      expect(firstBlock).toHaveProperty('name');
-      expect(firstBlock).toHaveProperty('baseX');
-      expect(firstBlock).toHaveProperty('baseY');
-      expect(firstBlock).toHaveProperty('baseZ');
+			expect(blocks.size()).toBeGreaterThan(0);
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
+			// Check block structure
+			const firstBlock = blocks.get(0);
+			expect(firstBlock).toHaveProperty("name");
+			expect(firstBlock).toHaveProperty("baseX");
+			expect(firstBlock).toHaveProperty("baseY");
+			expect(firstBlock).toHaveProperty("baseZ");
 
-    it('should read block references (inserts)', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			reader.delete();
+			Module._free(dataPtr);
+		});
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const inserts = reader.getInserts();
+		it("should read block references (inserts)", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      expect(inserts.size()).toBeGreaterThan(0);
-      
-      // Check insert structure
-      const firstInsert = inserts.get(0);
-      expect(firstInsert).toHaveProperty('blockName');
-      expect(firstInsert).toHaveProperty('ipx');
-      expect(firstInsert).toHaveProperty('ipy');
-      expect(firstInsert).toHaveProperty('sx');
-      expect(firstInsert).toHaveProperty('sy');
-      expect(firstInsert).toHaveProperty('angle');
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const inserts = reader.getInserts();
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
+			expect(inserts.size()).toBeGreaterThan(0);
 
-    it('should validate block references', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			// Check insert structure
+			const firstInsert = inserts.get(0);
+			expect(firstInsert).toHaveProperty("blockName");
+			expect(firstInsert).toHaveProperty("ipx");
+			expect(firstInsert).toHaveProperty("ipy");
+			expect(firstInsert).toHaveProperty("sx");
+			expect(firstInsert).toHaveProperty("sy");
+			expect(firstInsert).toHaveProperty("angle");
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const blocks = reader.getBlocks();
-      const inserts = reader.getInserts();
-      const errors = reader.getParsingErrors();
+			reader.delete();
+			Module._free(dataPtr);
+		});
 
-      // Create block name set
-      const blockNames = new Set();
-      for (let i = 0; i < blocks.size(); i++) {
-        blockNames.add(blocks.get(i).name);
-      }
+		it("should validate block references", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      // Check all inserts reference existing blocks
-      for (let i = 0; i < inserts.size(); i++) {
-        const insert = inserts.get(i);
-        if (!blockNames.has(insert.blockName)) {
-          // Should have error for invalid reference
-          const hasError = errors.size() > 0;
-          expect(hasError).toBe(true);
-        }
-      }
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const blocks = reader.getBlocks();
+			const inserts = reader.getInserts();
+			const errors = reader.getParsingErrors();
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
-  });
+			// Create block name set
+			const blockNames = new Set();
+			for (let i = 0; i < blocks.size(); i++) {
+				blockNames.add(blocks.get(i).name);
+			}
 
-  describe('Hatch Entities', () => {
-    it('should read hatch patterns', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			// Check all inserts reference existing blocks
+			for (let i = 0; i < inserts.size(); i++) {
+				const insert = inserts.get(i);
+				if (!blockNames.has(insert.blockName)) {
+					// Should have error for invalid reference
+					const hasError = errors.size() > 0;
+					expect(hasError).toBe(true);
+				}
+			}
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const hatches = reader.getHatches();
+			reader.delete();
+			Module._free(dataPtr);
+		});
+	});
 
-      if (hatches.size() > 0) {
-        const firstHatch = hatches.get(0);
-        expect(firstHatch).toHaveProperty('patternType');
-        expect(firstHatch).toHaveProperty('patternName');
-        expect(firstHatch).toHaveProperty('solid');
-        expect(firstHatch).toHaveProperty('angle');
-        expect(firstHatch).toHaveProperty('scale');
-        expect(firstHatch).toHaveProperty('loops');
-      }
+	describe("Hatch Entities", () => {
+		it("should read hatch patterns", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const hatches = reader.getHatches();
 
-    it('should read hatch boundaries', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			if (hatches.size() > 0) {
+				const firstHatch = hatches.get(0);
+				expect(firstHatch).toHaveProperty("patternType");
+				expect(firstHatch).toHaveProperty("patternName");
+				expect(firstHatch).toHaveProperty("solid");
+				expect(firstHatch).toHaveProperty("angle");
+				expect(firstHatch).toHaveProperty("scale");
+				expect(firstHatch).toHaveProperty("loops");
+			}
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const hatches = reader.getHatches();
+			reader.delete();
+			Module._free(dataPtr);
+		});
 
-      if (hatches.size() > 0) {
-        const firstHatch = hatches.get(0);
-        if (firstHatch.loops && firstHatch.loops.size() > 0) {
-          const firstLoop = firstHatch.loops.get(0);
-          expect(firstLoop).toHaveProperty('type');
-          expect(firstLoop).toHaveProperty('edges');
-          expect(firstLoop).toHaveProperty('isCCW');
-        }
-      }
+		it("should read hatch boundaries", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
-  });
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const hatches = reader.getHatches();
 
-  describe('Extended Dimension Types', () => {
-    it('should read all dimension types', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			if (hatches.size() > 0) {
+				const firstHatch = hatches.get(0);
+				if (firstHatch.loops && firstHatch.loops.size() > 0) {
+					const firstLoop = firstHatch.loops.get(0);
+					expect(firstLoop).toHaveProperty("type");
+					expect(firstLoop).toHaveProperty("edges");
+					expect(firstLoop).toHaveProperty("isCCW");
+				}
+			}
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const dimensions = reader.getDimensions();
+			reader.delete();
+			Module._free(dataPtr);
+		});
+	});
 
-      // Count dimension types
-      const dimTypes = new Map<number, number>();
-      for (let i = 0; i < dimensions.size(); i++) {
-        const dim = dimensions.get(i);
-        const type = dim.type;
-        dimTypes.set(type, (dimTypes.get(type) || 0) + 1);
-      }
+	describe("Extended Dimension Types", () => {
+		it("should read all dimension types", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      // Check if we have various dimension types
-      console.log('Dimension types found:', Array.from(dimTypes.entries()));
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const dimensions = reader.getDimensions();
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
+			// Count dimension types
+			const dimTypes = new Map<number, number>();
+			for (let i = 0; i < dimensions.size(); i++) {
+				const dim = dimensions.get(i);
+				const type = dim.type;
+				dimTypes.set(type, (dimTypes.get(type) || 0) + 1);
+			}
 
-    it('should read radial and diametric dimensions', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			// Check if we have various dimension types
+			console.log("Dimension types found:", Array.from(dimTypes.entries()));
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const dimensions = reader.getDimensions();
+			reader.delete();
+			Module._free(dataPtr);
+		});
 
-      // Find radial/diametric dimensions
-      for (let i = 0; i < dimensions.size(); i++) {
-        const dim = dimensions.get(i);
-        if (dim.type === 2 || dim.type === 3) { // RADIAL or DIAMETRIC
-          expect(dim).toHaveProperty('dpx');
-          expect(dim).toHaveProperty('dpy');
-          expect(dim).toHaveProperty('text');
-        }
-      }
+		it("should read radial and diametric dimensions", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
-  });
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const dimensions = reader.getDimensions();
 
-  describe('Leader Entities', () => {
-    it('should read leader entities', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			// Find radial/diametric dimensions
+			for (let i = 0; i < dimensions.size(); i++) {
+				const dim = dimensions.get(i);
+				if (dim.type === 2 || dim.type === 3) {
+					// RADIAL or DIAMETRIC
+					expect(dim).toHaveProperty("dpx");
+					expect(dim).toHaveProperty("dpy");
+					expect(dim).toHaveProperty("text");
+				}
+			}
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const leaders = reader.getLeaders();
+			reader.delete();
+			Module._free(dataPtr);
+		});
+	});
 
-      if (leaders.size() > 0) {
-        const firstLeader = leaders.get(0);
-        expect(firstLeader).toHaveProperty('arrowHeadFlag');
-        expect(firstLeader).toHaveProperty('pathType');
-        expect(firstLeader).toHaveProperty('vertices');
-        expect(firstLeader.vertices.size()).toBeGreaterThan(0);
-      }
+	describe("Leader Entities", () => {
+		it("should read leader entities", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
-  });
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const leaders = reader.getLeaders();
 
-  describe('Image Entities', () => {
-    it('should read image definitions and references', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			if (leaders.size() > 0) {
+				const firstLeader = leaders.get(0);
+				expect(firstLeader).toHaveProperty("arrowHeadFlag");
+				expect(firstLeader).toHaveProperty("pathType");
+				expect(firstLeader).toHaveProperty("vertices");
+				expect(firstLeader.vertices.size()).toBeGreaterThan(0);
+			}
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const images = reader.getImages();
-      const imageDefs = reader.getImageDefs();
+			reader.delete();
+			Module._free(dataPtr);
+		});
+	});
 
-      if (images.size() > 0) {
-        const firstImage = images.get(0);
-        expect(firstImage).toHaveProperty('imageDefHandle');
-        expect(firstImage).toHaveProperty('ipx');
-        expect(firstImage).toHaveProperty('ipy');
-        expect(firstImage).toHaveProperty('width');
-        expect(firstImage).toHaveProperty('height');
-      }
+	describe("Image Entities", () => {
+		it("should read image definitions and references", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      if (imageDefs.size() > 0) {
-        const firstDef = imageDefs.get(0);
-        expect(firstDef).toHaveProperty('fileName');
-      }
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const images = reader.getImages();
+			const imageDefs = reader.getImageDefs();
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
-  });
+			if (images.size() > 0) {
+				const firstImage = images.get(0);
+				expect(firstImage).toHaveProperty("imageDefHandle");
+				expect(firstImage).toHaveProperty("ipx");
+				expect(firstImage).toHaveProperty("ipy");
+				expect(firstImage).toHaveProperty("width");
+				expect(firstImage).toHaveProperty("height");
+			}
 
-  describe('Memory Management', () => {
-    it('should report memory usage', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			if (imageDefs.size() > 0) {
+				const firstDef = imageDefs.get(0);
+				expect(firstDef).toHaveProperty("fileName");
+			}
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const memoryUsage = reader.getMemoryUsage();
+			reader.delete();
+			Module._free(dataPtr);
+		});
+	});
 
-      expect(memoryUsage).toBeGreaterThan(0);
-      console.log('Memory usage:', memoryUsage, 'bytes');
+	describe("Memory Management", () => {
+		it("should report memory usage", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const memoryUsage = reader.getMemoryUsage();
 
-    it('should provide entity statistics', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			expect(memoryUsage).toBeGreaterThan(0);
+			console.log("Memory usage:", memoryUsage, "bytes");
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const stats = reader.getEntityStats();
+			reader.delete();
+			Module._free(dataPtr);
+		});
 
-      expect(stats.size).toBeGreaterThan(0);
-      
-      // Log statistics
-      console.log('Entity statistics:');
-      stats.forEach((count, type) => {
-        console.log(`  ${type}: ${count}`);
-      });
+		it("should provide entity statistics", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const stats = reader.getEntityStats();
 
-    it('should handle large files efficiently', () => {
-      // Create a large test data (simulate large file)
-      const largeData = new Uint8Array(1024 * 1024); // 1MB
-      largeData.set(testFileData); // Copy test data at beginning
+			expect(stats.size).toBeGreaterThan(0);
 
-      const startTime = performance.now();
-      const dataPtr = Module._malloc(largeData.length);
-      Module.HEAPU8.set(largeData, dataPtr);
+			// Log statistics
+			console.log("Entity statistics:");
+			stats.forEach((count, type) => {
+				console.log(`  ${type}: ${count}`);
+			});
 
-      const reader = new Module.JWWReader(dataPtr, largeData.length);
-      const parseTime = performance.now() - startTime;
+			reader.delete();
+			Module._free(dataPtr);
+		});
 
-      console.log('Large file parse time:', parseTime, 'ms');
-      expect(parseTime).toBeLessThan(5000); // Should parse within 5 seconds
+		it("should handle large files efficiently", () => {
+			// Create a large test data (simulate large file)
+			const largeData = new Uint8Array(1024 * 1024); // 1MB
+			largeData.set(testFileData); // Copy test data at beginning
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
-  });
+			const startTime = performance.now();
+			const dataPtr = Module._malloc(largeData.length);
+			Module.HEAPU8.set(largeData, dataPtr);
 
-  describe('Error Handling', () => {
-    it('should report parsing errors', () => {
-      const dataPtr = Module._malloc(testFileData.length);
-      Module.HEAPU8.set(testFileData, dataPtr);
+			const reader = new Module.JWWReader(dataPtr, largeData.length);
+			const parseTime = performance.now() - startTime;
 
-      const reader = new Module.JWWReader(dataPtr, testFileData.length);
-      const errors = reader.getParsingErrors();
+			console.log("Large file parse time:", parseTime, "ms");
+			expect(parseTime).toBeLessThan(5000); // Should parse within 5 seconds
 
-      // Check error structure if any errors exist
-      if (errors.size() > 0) {
-        const firstError = errors.get(0);
-        expect(firstError).toHaveProperty('type');
-        expect(firstError).toHaveProperty('message');
-        expect(firstError).toHaveProperty('entityType');
-      }
+			reader.delete();
+			Module._free(dataPtr);
+		});
+	});
 
-      reader.delete();
-      Module._free(dataPtr);
-    });
+	describe("Error Handling", () => {
+		it("should report parsing errors", () => {
+			const dataPtr = Module._malloc(testFileData.length);
+			Module.HEAPU8.set(testFileData, dataPtr);
 
-    it('should handle invalid data gracefully', () => {
-      const invalidData = new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF]);
-      const dataPtr = Module._malloc(invalidData.length);
-      Module.HEAPU8.set(invalidData, dataPtr);
+			const reader = new Module.JWWReader(dataPtr, testFileData.length);
+			const errors = reader.getParsingErrors();
 
-      expect(() => {
-        const reader = new Module.JWWReader(dataPtr, invalidData.length);
-        reader.delete();
-      }).not.toThrow();
+			// Check error structure if any errors exist
+			if (errors.size() > 0) {
+				const firstError = errors.get(0);
+				expect(firstError).toHaveProperty("type");
+				expect(firstError).toHaveProperty("message");
+				expect(firstError).toHaveProperty("entityType");
+			}
 
-      Module._free(dataPtr);
-    });
-  });
+			reader.delete();
+			Module._free(dataPtr);
+		});
+
+		it("should handle invalid data gracefully", () => {
+			const invalidData = new Uint8Array([0xff, 0xff, 0xff, 0xff]);
+			const dataPtr = Module._malloc(invalidData.length);
+			Module.HEAPU8.set(invalidData, dataPtr);
+
+			expect(() => {
+				const reader = new Module.JWWReader(dataPtr, invalidData.length);
+				reader.delete();
+			}).not.toThrow();
+
+			Module._free(dataPtr);
+		});
+	});
 });

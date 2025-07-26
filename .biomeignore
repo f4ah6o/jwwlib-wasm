@@ -1,0 +1,11 @@
+node_modules
+dist
+build*
+coverage
+wasm
+*.min.js
+*.map
+tests/e2e/playwright-report
+tests/e2e/test-results
+.claude
+.git
