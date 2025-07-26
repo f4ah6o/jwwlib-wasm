@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWW WASM Module Test</title>
+</head>
+<body>
+    <h1>JWW WASM Module Test</h1>
+    <div id="status">Loading module...</div>
+    <pre id="output"></pre>
+
+    <script>
+        // Load the WASM module
+        const script = document.createElement('script');
+        script.src = '../wasm/jwwlib.js';
+        document.head.appendChild(script);
+
+        script.onload = async () => {
+            try {
+                const JWWModule = await createJWWModule();
+                
+                // Update status
+                document.getElementById('status').textContent = 'Module loaded successfully!';
+                
+                // Display module info
+                const info = {
+                    ready: true,
+                    hasJWWReader: typeof JWWModule.JWWReader !== 'undefined',
+                    hasJWWDocumentWASM: typeof JWWModule.JWWDocumentWASM !== 'undefined',
+                    methods: {
+                        malloc: typeof JWWModule._malloc === 'function',
+                        free: typeof JWWModule._free === 'function',
+                        HEAPU8: JWWModule.HEAPU8 !== undefined
+                    }
+                };
+                
+                // Test JWWDocumentWASM if available
+                if (info.hasJWWDocumentWASM) {
+                    const doc = new JWWModule.JWWDocumentWASM();
+                    info.documentMethods = {
+                        loadFromMemory: typeof doc.loadFromMemory === 'function',
+                        getEntities: typeof doc.getEntities === 'function',
+                        getLayers: typeof doc.getLayers === 'function',
+                        getEntityCount: typeof doc.getEntityCount === 'function',
+                        getLayerCount: typeof doc.getLayerCount === 'function',
+                        hasError: typeof doc.hasError === 'function',
+                        getLastError: typeof doc.getLastError === 'function',
+                        dispose: typeof doc.dispose === 'function',
+                        getMemoryUsage: typeof doc.getMemoryUsage === 'function'
+                    };
+                    doc.dispose();
+                }
+                
+                document.getElementById('output').textContent = JSON.stringify(info, null, 2);
+                
+                // Make module available globally for tests
+                window.createJWWModule = createJWWModule;
+                
+            } catch (error) {
+                document.getElementById('status').textContent = 'Failed to load module: ' + error.message;
+                console.error(error);
+            }
+        };
+
+        script.onerror = () => {
+            document.getElementById('status').textContent = 'Failed to load module script';
+        };
+    </script>
+</body>
+</html>

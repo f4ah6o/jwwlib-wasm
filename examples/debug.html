@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWW WASM Debug</title>
+</head>
+<body>
+    <h1>JWW WASM Debug</h1>
+    <div id="status">Loading module...</div>
+    <pre id="output"></pre>
+
+    <script>
+        // Load the WASM module
+        const script = document.createElement('script');
+        script.src = '../wasm/jwwlib.js';
+        document.head.appendChild(script);
+
+        script.onload = async () => {
+            const log = (msg) => {
+                const output = document.getElementById('output');
+                output.textContent += msg + '\n';
+                console.log(msg);
+            };
+
+            try {
+                const JWWModule = await createJWWModule();
+                document.getElementById('status').textContent = 'Module loaded successfully!';
+                
+                // Test JWWDocumentWASM
+                log('Creating JWWDocumentWASM instance...');
+                const doc = new JWWModule.JWWDocumentWASM();
+                log('Created successfully');
+                
+                // Test methods
+                log('Testing methods...');
+                log('- hasError: ' + doc.hasError());
+                log('- getEntityCount: ' + doc.getEntityCount());
+                log('- getLayerCount: ' + doc.getLayerCount());
+                log('- getMemoryUsage: ' + doc.getMemoryUsage());
+                
+                // Test getEntities
+                log('\nTesting getEntities...');
+                try {
+                    const entities = doc.getEntities();
+                    log('- entities.size(): ' + entities.size());
+                } catch (e) {
+                    log('- getEntities error: ' + e.toString());
+                }
+                
+                // Test getLayers
+                log('\nTesting getLayers...');
+                try {
+                    const layers = doc.getLayers();
+                    log('- layers.size(): ' + layers.size());
+                } catch (e) {
+                    log('- getLayers error: ' + e.toString());
+                }
+                
+                // Test loadFromMemory with dummy data
+                log('\nTesting loadFromMemory with dummy data...');
+                const dummyData = new Uint8Array(100);
+                const dataPtr = JWWModule._malloc(dummyData.length);
+                JWWModule.HEAPU8.set(dummyData, dataPtr);
+                
+                try {
+                    const loaded = doc.loadFromMemory(dataPtr, dummyData.length);
+                    log('- loaded: ' + loaded);
+                    log('- hasError: ' + doc.hasError());
+                    if (doc.hasError()) {
+                        log('- error: ' + doc.getLastError());
+                    }
+                } catch (e) {
+                    log('- loadFromMemory error: ' + e.toString());
+                }
+                
+                JWWModule._free(dataPtr);
+                
+                // Test dispose
+                log('\nTesting dispose...');
+                try {
+                    doc.dispose();
+                    log('- dispose successful');
+                } catch (e) {
+                    log('- dispose error: ' + e.toString());
+                }
+                
+                log('\nAll tests completed!');
+                
+            } catch (error) {
+                document.getElementById('status').textContent = 'Failed: ' + error.message;
+                console.error(error);
+            }
+        };
+
+        script.onerror = () => {
+            document.getElementById('status').textContent = 'Failed to load module script';
+        };
+    </script>
+</body>
+</html>

@@ -287,8 +287,9 @@
         
         // グローバル変数
         let JWWModule = null;
-        let currentReader = null;
+        let currentDocument = null;
         let currentEntities = null;
+        let currentLayers = null;
         
         // 色マッピング
         const colorToRGB = {
@@ -396,6 +397,7 @@
             const info = {
                 ready: true,
                 hasJWWReader: typeof JWWModule.JWWReader !== 'undefined',
+                hasJWWDocumentWASM: typeof JWWModule.JWWDocumentWASM !== 'undefined',
                 malloc: typeof JWWModule._malloc === 'function',
                 free: typeof JWWModule._free === 'function'
             };
@@ -409,26 +411,43 @@
                 return;
             }
             
+            let dataPtr = null;
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 const uint8Array = new Uint8Array(arrayBuffer);
                 
-                const dataPtr = JWWModule._malloc(uint8Array.length);
+                dataPtr = JWWModule._malloc(uint8Array.length);
                 JWWModule.HEAPU8.set(uint8Array, dataPtr);
                 
-                if (currentReader) {
-                    currentReader.delete();
+                if (currentDocument) {
+                    currentDocument.dispose();
                 }
                 
-                currentReader = new JWWModule.JWWReader(dataPtr, uint8Array.length);
-                currentEntities = currentReader.getEntities();
+                // 新しいJWWDocumentWASMインターフェースを使用
+                currentDocument = new JWWModule.JWWDocumentWASM();
+                const loaded = currentDocument.loadFromMemory(dataPtr, uint8Array.length);
+                
+                if (!loaded) {
+                    const error = currentDocument.getLastError();
+                    throw new Error(error || 'Failed to load JWW file');
+                }
+                
+                currentEntities = currentDocument.getEntities();
+                currentLayers = currentDocument.getLayers();
                 
                 updateAllTabs(file);
                 
-                JWWModule._free(dataPtr);
             } catch (error) {
                 console.error('Error reading file:', error);
                 alert('ファイルの読み込みに失敗しました: ' + error.message);
+                if (currentDocument) {
+                    currentDocument.dispose();
+                    currentDocument = null;
+                }
+            } finally {
+                if (dataPtr !== null) {
+                    JWWModule._free(dataPtr);
+                }
             }
         }
         
@@ -450,7 +469,9 @@
             info.innerHTML = `
                 <strong>ファイル名:</strong> ${file.name}<br>
                 <strong>サイズ:</strong> ${(file.size / 1024).toFixed(2)} KB<br>
-                <strong>エンティティ数:</strong> ${currentEntities.size()}
+                <strong>エンティティ数:</strong> ${currentDocument.getEntityCount()}<br>
+                <strong>レイヤー数:</strong> ${currentDocument.getLayerCount()}<br>
+                <strong>メモリ使用量:</strong> ${(currentDocument.getMemoryUsage() / 1024).toFixed(2)} KB
             `;
             
             drawEntities(canvas, currentEntities);
@@ -565,20 +586,40 @@
             const info = document.getElementById('encodingInfo');
             const canvas = document.getElementById('textCanvas');
             
-            const texts = currentReader.getTexts();
-            let infoHtml = '<div class="test-result success">';
-            infoHtml += `<strong>テキストエンティティ数:</strong> ${texts.size()}<br>`;
+            // 新しいインターフェースではテキストは統合されている
+            const textEntities = [];
+            for (let i = 0; i < currentEntities.size(); i++) {
+                const entity = currentEntities.get(i);
+                if (entity.type === 'TEXT') {
+                    textEntities.push(entity);
+                }
+            }
             
-            if (texts.size() > 0) {
+            let infoHtml = '<div class="test-result success">';
+            infoHtml += `<strong>テキストエンティティ数:</strong> ${textEntities.length}<br>`;
+            
+            if (textEntities.length > 0) {
                 infoHtml += '<strong>テキストサンプル:</strong><br>';
-                for (let i = 0; i < Math.min(5, texts.size()); i++) {
-                    const textData = texts.get(i);
+                for (let i = 0; i < Math.min(5, textEntities.length); i++) {
+                    const textData = textEntities[i];
                     const decoded = getEntityText(textData);
                     infoHtml += `${i + 1}. "${decoded}"<br>`;
                 }
             }
             infoHtml += '</div>';
             info.innerHTML = infoHtml;
+            
+            // レイヤー情報も表示
+            if (currentLayers && currentLayers.size() > 0) {
+                infoHtml += '<div class="test-result success" style="margin-top: 10px;">';
+                infoHtml += `<strong>レイヤー情報:</strong><br>`;
+                for (let i = 0; i < currentLayers.size(); i++) {
+                    const layer = currentLayers.get(i);
+                    infoHtml += `${layer.index}: ${layer.name} (${layer.entityCount}個のエンティティ)<br>`;
+                }
+                infoHtml += '</div>';
+                info.innerHTML = infoHtml;
+            }
             
             // テキストを描画
             drawTextEntities(canvas, currentEntities);
@@ -603,7 +644,7 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            if (entities.size() === 0) return;
+            if (!entities || entities.size() === 0) return;
             
             const bounds = findBounds(entities);
             const padding = 40;
