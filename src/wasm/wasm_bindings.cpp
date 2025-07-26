@@ -14,6 +14,7 @@
 #include <cmath>
 #include <map>
 #include <sstream>
+#include <emscripten/console.h>
 
 // Error types for parsing
 enum class ParseErrorType {
@@ -39,6 +40,29 @@ struct JSParseError {
     
     JSParseError(ParseErrorType t, const std::string& msg, const std::string& entity = "", int line = 0)
         : type(t), message(msg), entityType(entity), lineNumber(line) {}
+};
+
+// JavaScript-friendly entity and layer structures for new interface
+struct JSEntityData {
+    std::string type;                    // Entity type (LINE, CIRCLE, ARC, TEXT, etc.)
+    std::vector<double> coordinates;     // Entity coordinates [x1,y1,x2,y2] for LINE, [cx,cy,radius] for CIRCLE, etc.
+    std::map<std::string, double> properties; // Additional properties (angles, heights, etc.)
+    int color;
+    int layer;
+    
+    // Constructor for convenience
+    JSEntityData() : color(256), layer(0) {}
+};
+
+struct JSLayerData {
+    int index;                          // Layer index
+    std::string name;                   // Layer name
+    int color;                          // Layer color
+    bool visible;                       // Layer visibility
+    size_t entityCount;                 // Number of entities in this layer
+    
+    // Constructor with defaults
+    JSLayerData() : index(0), color(7), visible(true), entityCount(0) {}
 };
 
 // Simple entity data structures for JavaScript
@@ -853,6 +877,177 @@ public:
     virtual void endEntity() override {}
 };
 
+// JWW Document class for new WASM interface
+class JWWDocumentWASM {
+private:
+    std::unique_ptr<JSCreationInterface> creationInterface;
+    std::vector<JSEntityData> entities;
+    std::vector<JSLayerData> layers;
+    std::string lastError;
+    bool hasErrorFlag;
+    
+    // Convert existing entity types to new JSEntityData format
+    void convertEntitiesToNewFormat() {
+        entities.clear();
+        
+        // Convert lines
+        for (const auto& line : creationInterface->getLines()) {
+            JSEntityData entity;
+            entity.type = "LINE";
+            entity.coordinates = {line.x1, line.y1, line.x2, line.y2};
+            entity.color = line.color;
+            entities.push_back(entity);
+        }
+        
+        // Convert circles
+        for (const auto& circle : creationInterface->getCircles()) {
+            JSEntityData entity;
+            entity.type = "CIRCLE";
+            entity.coordinates = {circle.cx, circle.cy, circle.radius};
+            entity.color = circle.color;
+            entities.push_back(entity);
+        }
+        
+        // Convert arcs
+        for (const auto& arc : creationInterface->getArcs()) {
+            JSEntityData entity;
+            entity.type = "ARC";
+            entity.coordinates = {arc.cx, arc.cy, arc.radius};
+            entity.properties["angle1"] = arc.angle1;
+            entity.properties["angle2"] = arc.angle2;
+            entity.color = arc.color;
+            entities.push_back(entity);
+        }
+        
+        // Convert texts
+        for (const auto& text : creationInterface->getTexts()) {
+            JSEntityData entity;
+            entity.type = "TEXT";
+            entity.coordinates = {text.x, text.y};
+            entity.properties["height"] = text.height;
+            entity.properties["angle"] = text.angle;
+            entity.properties["text"] = 0; // Text stored separately
+            entity.color = text.color;
+            entities.push_back(entity);
+        }
+    }
+    
+public:
+    JWWDocumentWASM() : hasErrorFlag(false) {
+        creationInterface = std::make_unique<JSCreationInterface>();
+    }
+    
+    // Load JWW file from memory
+    bool loadFromMemory(uintptr_t dataPtr, size_t size) {
+        hasErrorFlag = false;
+        lastError.clear();
+        
+        creationInterface->clear();
+        
+        // Use existing JWWReader logic
+        const uint8_t* data = reinterpret_cast<const uint8_t*>(dataPtr);
+        std::string tempFile = "/tmp/jww_temp.jww";
+        FILE* fp = fopen(tempFile.c_str(), "wb");
+        if (!fp) {
+            lastError = "Failed to create temporary file";
+            hasErrorFlag = true;
+            return false;
+        }
+        
+        size_t written = fwrite(data, 1, size, fp);
+        fclose(fp);
+        
+        if (written != size) {
+            remove(tempFile.c_str());
+            lastError = "Failed to write temporary file";
+            hasErrorFlag = true;
+            return false;
+        }
+        
+        DL_Jww jww;
+        bool result = jww.in(tempFile, creationInterface.get());
+        remove(tempFile.c_str());
+        
+        if (result) {
+            convertEntitiesToNewFormat();
+            // TODO: Extract layer information
+            // For now, create default layer
+            JSLayerData defaultLayer;
+            defaultLayer.index = 0;
+            defaultLayer.name = "0";
+            defaultLayer.color = 7;
+            defaultLayer.visible = true;
+            defaultLayer.entityCount = entities.size();
+            layers.push_back(defaultLayer);
+            
+            // Log success
+            emscripten_console_log("JWWDocumentWASM: Successfully loaded file");
+        } else {
+            lastError = "Failed to parse JWW file";
+            hasErrorFlag = true;
+            emscripten_console_error("JWWDocumentWASM: Failed to parse JWW file");
+        }
+        
+        return result;
+    }
+    
+    // Get all entities
+    std::vector<JSEntityData> getEntities() const {
+        return entities;
+    }
+    
+    // Get all layers
+    std::vector<JSLayerData> getLayers() const {
+        return layers;
+    }
+    
+    // Get entity count
+    size_t getEntityCount() const {
+        return entities.size();
+    }
+    
+    // Get layer count
+    size_t getLayerCount() const {
+        return layers.size();
+    }
+    
+    // Error handling
+    bool hasError() const {
+        return hasErrorFlag;
+    }
+    
+    const std::string& getLastError() const {
+        return lastError;
+    }
+    
+    // Memory management
+    void dispose() {
+        // Clear vectors first
+        entities.clear();
+        layers.clear();
+        
+        // Then reset the creation interface
+        if (creationInterface) {
+            creationInterface.reset();
+        }
+        
+        // Clear error state
+        lastError.clear();
+        hasErrorFlag = false;
+    }
+    
+    // Get memory usage
+    size_t getMemoryUsage() const {
+        size_t usage = sizeof(*this);
+        usage += entities.capacity() * sizeof(JSEntityData);
+        usage += layers.capacity() * sizeof(JSLayerData);
+        if (creationInterface) {
+            usage += creationInterface->getEstimatedMemoryUsage();
+        }
+        return usage;
+    }
+};
+
 // JWW Reader wrapper class
 class JWWReader {
 private:
@@ -1198,6 +1393,39 @@ public:
 using namespace emscripten;
 
 EMSCRIPTEN_BINDINGS(jwwlib_module) {
+    // New unified data structures
+    value_object<JSEntityData>("JSEntityData")
+        .field("type", &JSEntityData::type)
+        .field("coordinates", &JSEntityData::coordinates)
+        .field("properties", &JSEntityData::properties)
+        .field("color", &JSEntityData::color)
+        .field("layer", &JSEntityData::layer);
+    
+    value_object<JSLayerData>("JSLayerData")
+        .field("index", &JSLayerData::index)
+        .field("name", &JSLayerData::name)
+        .field("color", &JSLayerData::color)
+        .field("visible", &JSLayerData::visible)
+        .field("entityCount", &JSLayerData::entityCount);
+    
+    // Register vectors and maps for new structures
+    register_vector<JSEntityData>("JSEntityDataVector");
+    register_vector<JSLayerData>("JSLayerDataVector");
+    register_map<std::string, double>("StringDoubleMap");
+    
+    // JWWDocumentWASM class binding
+    class_<JWWDocumentWASM>("JWWDocumentWASM")
+        .constructor<>()
+        .function("loadFromMemory", &JWWDocumentWASM::loadFromMemory)
+        .function("getEntities", &JWWDocumentWASM::getEntities)
+        .function("getLayers", &JWWDocumentWASM::getLayers)
+        .function("getEntityCount", &JWWDocumentWASM::getEntityCount)
+        .function("getLayerCount", &JWWDocumentWASM::getLayerCount)
+        .function("hasError", &JWWDocumentWASM::hasError)
+        .function("getLastError", &JWWDocumentWASM::getLastError)
+        .function("dispose", &JWWDocumentWASM::dispose)
+        .function("getMemoryUsage", &JWWDocumentWASM::getMemoryUsage);
+    
     // Data structures
     value_object<JSLineData>("LineData")
         .field("x1", &JSLineData::x1)
