@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 
 // Type definitions for the WASM module
@@ -12,22 +11,27 @@ interface JWWModule {
 	JWWReader: new (dataPtr: number, size: number) => JWWReaderInstance;
 }
 
+interface VectorLike<T> {
+	size(): number;
+	get(index: number): T;
+}
+
 interface JWWReaderInstance {
-	getLines: () => any[];
-	getCircles: () => any[];
-	getArcs: () => any[];
-	getTexts: () => any[];
-	getBlocks: () => any[];
-	getInserts: () => any[];
-	getHatches: () => any[];
-	getLeaders: () => any[];
-	getImages: () => any[];
-	getImageDefs: () => any[];
-	getDimensions: () => any[];
-	getSplines: () => any[];
-	getParsingErrors: () => any[];
+	getLines: () => VectorLike<unknown>;
+	getCircles: () => VectorLike<unknown>;
+	getArcs: () => VectorLike<unknown>;
+	getTexts: () => VectorLike<unknown>;
+	getBlocks: () => VectorLike<unknown>;
+	getInserts: () => VectorLike<unknown>;
+	getHatches: () => VectorLike<unknown>;
+	getLeaders: () => VectorLike<unknown>;
+	getImages: () => VectorLike<unknown>;
+	getImageDefs: () => VectorLike<unknown>;
+	getDimensions: () => VectorLike<unknown>;
+	getSplines: () => VectorLike<unknown>;
+	getParsingErrors: () => VectorLike<unknown>;
 	getMemoryUsage: () => number;
-	getEntityStats: () => Map<string, number>;
+	getEntityStats: () => VectorLike<unknown>;
 	delete: () => void;
 }
 
@@ -39,13 +43,13 @@ describe("New Entity Types Support", () => {
 		// Load WASM module
 		const wasmPath = join(__dirname, "../../wasm/jwwlib.js");
 		const { default: createModule } = await import(wasmPath);
-		
+
 		// Read WASM binary directly
 		const wasmBinaryPath = join(__dirname, "../../wasm/jwwlib.wasm");
 		const wasmBinary = readFileSync(wasmBinaryPath);
-		
+
 		Module = await createModule({
-			wasmBinary: wasmBinary
+			wasmBinary: wasmBinary,
 		});
 		await Module.ready;
 

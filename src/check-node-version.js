@@ -2,8 +2,8 @@
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import semver from "semver";
 import { fileURLToPath } from "node:url";
+import semver from "semver";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

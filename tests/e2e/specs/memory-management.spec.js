@@ -30,8 +30,8 @@ test.describe("Memory Management", () => {
 				const reader = new JWWModule.JWWReader(dataPtr, testData.length);
 
 				// Use the reader
-				const entities = reader.getEntities();
-				const header = reader.getHeader();
+				const _entities = reader.getEntities();
+				const _header = reader.getHeader();
 
 				// Clean up
 				reader.delete();

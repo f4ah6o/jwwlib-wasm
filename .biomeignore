@@ -1,6 +1,8 @@
 node_modules
 dist
 build*
+build-debug
+build-release
 coverage
 wasm
 *.min.js
