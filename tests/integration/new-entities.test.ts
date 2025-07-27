@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 
 // Type definitions for the WASM module
@@ -39,13 +38,13 @@ describe("New Entity Types Support", () => {
 		// Load WASM module
 		const wasmPath = join(__dirname, "../../wasm/jwwlib.js");
 		const { default: createModule } = await import(wasmPath);
-		
+
 		// Read WASM binary directly
 		const wasmBinaryPath = join(__dirname, "../../wasm/jwwlib.wasm");
 		const wasmBinary = readFileSync(wasmBinaryPath);
-		
+
 		Module = await createModule({
-			wasmBinary: wasmBinary
+			wasmBinary: wasmBinary,
 		});
 		await Module.ready;
 

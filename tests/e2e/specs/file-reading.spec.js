@@ -1,6 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
 import { expect, test } from "@playwright/test";
-import fs from "fs";
-import path from "path";
 
 test.describe("JWW File Reading", () => {
 	test("should read a JWW file and get entities", async ({ page }) => {
@@ -71,7 +71,7 @@ test.describe("JWW File Reading", () => {
 			const JWWModule = await createJWWModule();
 
 			// Empty buffer
-			const uint8Array = new Uint8Array(0);
+			const _uint8Array = new Uint8Array(0);
 
 			// Allocate memory
 			const dataPtr = JWWModule._malloc(1); // Allocate at least 1 byte

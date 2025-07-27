@@ -20,7 +20,7 @@ export function decodeShiftJIS(bytes) {
 		try {
 			const decoder = new TextDecoder("utf-8");
 			return decoder.decode(new Uint8Array(bytes));
-		} catch (utf8Error) {
+		} catch (_utf8Error) {
 			// Final fallback: return placeholder
 			return "(encoding error)";
 		}
@@ -68,11 +68,7 @@ export function processTextData(textData) {
 	const processed = { ...textData };
 
 	// If textBytes exists, decode it
-	if (
-		textData.textBytes &&
-		textData.textBytes.size &&
-		textData.textBytes.size() > 0
-	) {
+	if (textData.textBytes?.size && textData.textBytes.size() > 0) {
 		// Convert WASM vector to JavaScript array
 		const bytes = [];
 		for (let i = 0; i < textData.textBytes.size(); i++) {

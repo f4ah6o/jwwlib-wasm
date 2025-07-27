@@ -37,7 +37,7 @@ test.describe("WASM Module Loading", () => {
 			const hasReader = reader !== null && reader !== undefined;
 
 			// Clean up
-			if (reader && reader.delete) {
+			if (reader?.delete) {
 				reader.delete();
 			}
 
@@ -85,7 +85,7 @@ test.describe("WASM Module Loading", () => {
 			};
 
 			// Clean up
-			if (document && document.dispose) {
+			if (document?.dispose) {
 				document.dispose();
 			}
 
