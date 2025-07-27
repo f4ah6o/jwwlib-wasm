@@ -31,10 +31,29 @@ async function init() {
 	// Browser/bundler environment - use dynamic import
 	try {
 		const module = await import("../../wasm/jwwlib.js");
+		// The module exports createJWWModule directly
 		const createJWWModule = module.default || module.createJWWModule || module;
+		
 		if (typeof createJWWModule === 'function') {
-			moduleInstance = await createJWWModule();
+			const instance = await createJWWModule();
+			moduleInstance = instance;
+			// Verify the module was initialized properly
+			if (!moduleInstance || !moduleInstance._malloc || !moduleInstance.JWWReader) {
+				throw new Error('WASM module initialized but required exports are missing');
+			}
 			return moduleInstance;
+		} else {
+			// If createJWWModule is not a function, the module might be the factory itself
+			if (typeof module === 'function') {
+				const instance = await module();
+				moduleInstance = instance;
+				// Verify the module was initialized properly
+				if (!moduleInstance || !moduleInstance._malloc || !moduleInstance.JWWReader) {
+					throw new Error('WASM module initialized but required exports are missing');
+				}
+				return moduleInstance;
+			}
+			throw new Error('Invalid WASM module format');
 		}
 	} catch (e) {
 		throw new Error(`Failed to load WASM module: ${e.message}`);
