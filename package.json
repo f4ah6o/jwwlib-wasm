@@ -43,7 +43,7 @@
 		"format": "biome format .",
 		"format:fix": "biome format --write .",
 		"prepublishOnly": "pnpm run build",
-		"version": "pnpm run build && git add -A dist",
+		"version": "pnpm run build",
 		"postversion": "git push && git push --tags",
 		"postinstall": "node src/check-node-version.js || true"
 	},
