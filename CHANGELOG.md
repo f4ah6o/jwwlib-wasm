@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6](https://github.com/f4ah6o/jwwlib-wasm/compare/v0.1.5...v0.1.6) (2025-07-27)
+
+### 🐛 Bug Fixes
+
+* resolve linter errors in JavaScript files ([addf69c](https://github.com/f4ah6o/jwwlib-wasm/commit/addf69cdbb412a2b94c8c3f7b6da99a060d55501))
+
 ## [0.1.5](https://github.com/f4ah6o/jwwlib-wasm/compare/v0.1.4...v0.1.5) (2025-07-27)
 
 ### 🐛 Bug Fixes
