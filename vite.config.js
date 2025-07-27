@@ -12,7 +12,7 @@ export default defineConfig({
 		outDir: "dist",
 		emptyOutDir: false,
 		rollupOptions: {
-			external: ["fs", "path", "url"],
+			external: ["fs", "path", "url", "node:fs", "node:path", "node:url", "node:module"],
 			output: {
 				exports: "named",
 				assetFileNames: (assetInfo) => {
