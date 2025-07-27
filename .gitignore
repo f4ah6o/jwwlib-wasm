@@ -4,6 +4,7 @@ node_modules/
 
 # Build outputs
 build/
+build-native/
 build-release/
 dist/
 wasm/*.wasm

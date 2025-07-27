@@ -1,7 +1,7 @@
 // ES6 module wrapper for jwwlib-wasm
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 let moduleInstance = null;
 
@@ -11,49 +11,65 @@ async function init() {
 	}
 
 	// Node.js environment - use require with CommonJS wrapper
-	if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+	if (
+		typeof process !== "undefined" &&
+		process.versions &&
+		process.versions.node
+	) {
 		const __filename = fileURLToPath(import.meta.url);
 		const __dirname = dirname(__filename);
 		const require = createRequire(import.meta.url);
-		const createJWWModule = require(join(__dirname, '../../wasm/jwwlib.cjs'));
-		
+		const createJWWModule = require(join(__dirname, "../../wasm/jwwlib.cjs"));
+
 		// Read WASM file for Node.js
-		const fs = await import('node:fs');
-		const wasmPath = join(__dirname, '../../wasm/jwwlib.wasm');
+		const fs = await import("node:fs");
+		const wasmPath = join(__dirname, "../../wasm/jwwlib.wasm");
 		const wasmBinary = fs.readFileSync(wasmPath);
-		
+
 		moduleInstance = await createJWWModule({
-			wasmBinary: wasmBinary
+			wasmBinary: wasmBinary,
 		});
 		return moduleInstance;
 	}
-	
+
 	// Browser/bundler environment - use dynamic import
 	try {
 		const module = await import("../../wasm/jwwlib.js");
 		// The module exports createJWWModule directly
 		const createJWWModule = module.default || module.createJWWModule || module;
-		
-		if (typeof createJWWModule === 'function') {
+
+		if (typeof createJWWModule === "function") {
 			const instance = await createJWWModule();
 			moduleInstance = instance;
 			// Verify the module was initialized properly
-			if (!moduleInstance || !moduleInstance._malloc || !moduleInstance.JWWReader) {
-				throw new Error('WASM module initialized but required exports are missing');
+			if (
+				!moduleInstance ||
+				!moduleInstance._malloc ||
+				!moduleInstance.JWWReader
+			) {
+				throw new Error(
+					"WASM module initialized but required exports are missing",
+				);
 			}
 			return moduleInstance;
 		} else {
 			// If createJWWModule is not a function, the module might be the factory itself
-			if (typeof module === 'function') {
+			if (typeof module === "function") {
 				const instance = await module();
 				moduleInstance = instance;
 				// Verify the module was initialized properly
-				if (!moduleInstance || !moduleInstance._malloc || !moduleInstance.JWWReader) {
-					throw new Error('WASM module initialized but required exports are missing');
+				if (
+					!moduleInstance ||
+					!moduleInstance._malloc ||
+					!moduleInstance.JWWReader
+				) {
+					throw new Error(
+						"WASM module initialized but required exports are missing",
+					);
 				}
 				return moduleInstance;
 			}
-			throw new Error('Invalid WASM module format');
+			throw new Error("Invalid WASM module format");
 		}
 	} catch (e) {
 		throw new Error(`Failed to load WASM module: ${e.message}`);
