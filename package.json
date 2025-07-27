@@ -10,7 +10,7 @@
 		".": {
 			"types": "./index.d.ts",
 			"import": "./src/js/jwwlib.js",
-			"require": "./wasm/jwwlib.js",
+			"require": "./wasm/jwwlib.cjs",
 			"default": "./wasm/jwwlib.js"
 		},
 		"./wasm": {
