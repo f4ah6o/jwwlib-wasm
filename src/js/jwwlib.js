@@ -1,19 +1,48 @@
 // ES6 module wrapper for jwwlib-wasm
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 let moduleInstance = null;
 
-export async function init() {
+async function init() {
 	if (moduleInstance) {
 		return moduleInstance;
 	}
 
-	// Load the Emscripten module
-	const module = await import("../../wasm/jwwlib.js");
-	const createJWWModule = module.default || module;
-	moduleInstance = await createJWWModule();
-
-	return moduleInstance;
+	// Node.js environment - use require with CommonJS wrapper
+	if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+		const __filename = fileURLToPath(import.meta.url);
+		const __dirname = dirname(__filename);
+		const require = createRequire(import.meta.url);
+		const createJWWModule = require(join(__dirname, '../../wasm/jwwlib.cjs'));
+		
+		// Read WASM file for Node.js
+		const fs = await import('node:fs');
+		const wasmPath = join(__dirname, '../../wasm/jwwlib.wasm');
+		const wasmBinary = fs.readFileSync(wasmPath);
+		
+		moduleInstance = await createJWWModule({
+			wasmBinary: wasmBinary
+		});
+		return moduleInstance;
+	}
+	
+	// Browser/bundler environment - use dynamic import
+	try {
+		const module = await import("../../wasm/jwwlib.js");
+		const createJWWModule = module.default || module.createJWWModule || module;
+		if (typeof createJWWModule === 'function') {
+			moduleInstance = await createJWWModule();
+			return moduleInstance;
+		}
+	} catch (e) {
+		throw new Error(`Failed to load WASM module: ${e.message}`);
+	}
 }
+
+// Default export that initializes and returns the module
+export default init;
 
 export class JWWReader {
 	constructor(buffer) {
